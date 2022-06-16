@@ -51,7 +51,14 @@ class SniperOMancer:
         self.ser = Service(
             "./chromedriver")  # included in zip, if it isn't, you can download it from here: https://chromedriver.storage.googleapis.com/index.html?path=98.0.4758.102/
         self.op = Options()
-        # self.op.add_argument("--headless")  # allows you to scrape page without opening the browser window
+        self.op.add_argument("--headless")  # allows you to scrape page without opening the browser window
+        self.op.add_argument("--allow-running-insecure-content")  # allows you to scrape jewarch
+        self.op.add_argument("--ignore-certificate-errors")  # allows you to scrape jewarch
+        self.op.add_argument("--window-size=1920,1080")
+
+        user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.50 Safari/537.36'
+        self.op.add_argument(f'user-agent={user_agent}')
+
         self.op.add_experimental_option('excludeSwitches', ['enable-logging'])  # remove annoying message
         self.newest_ca_driver = webdriver.Chrome(options=self.op)
         self.price_updater_driver = webdriver.Chrome(options=self.op)
@@ -326,7 +333,7 @@ class SniperOMancer:
                 if self.inoperation is False:
                     n_uptime = getuptime()
                     print(
-                        f'\n{Fore.CYAN}------------------------------------------\n{Fore.YELLOW}Overview:\nBalance: {Fore.WHITE}{self.fake_balance} BNB\n\n{Fore.YELLOW}Database:{Fore.WHITE}\n{self.database}\n\n{Fore.YELLOW}Currently fake holding:\n{Fore.WHITE}{self.fake_buy_current_list}\n\n{Fore.YELLOW}System:{Fore.WHITE}\nUptime: {n_uptime}\n{Fore.CYAN}------------------------------------------')
+                        f'\n{Fore.CYAN}-------------------------------------------------------------------\n{Fore.YELLOW}Overview:\nBalance: {Fore.WHITE}{self.fake_balance} BNB\n\n{Fore.YELLOW}Database:{Fore.WHITE}\n{self.database}\n\n{Fore.YELLOW}Currently fake holding:\n{Fore.WHITE}{self.fake_buy_current_list}\n\n{Fore.YELLOW}System:{Fore.WHITE}\nUptime: {n_uptime}\n{Fore.CYAN}-------------------------------------------------------------------')
                     time.sleep(60)
                 else:
                     time.sleep(2)
