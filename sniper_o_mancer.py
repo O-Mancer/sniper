@@ -158,12 +158,13 @@ class SniperOMancer:
 
                     try:
                         latest_ca_price = float(latest_ca_price.text.replace('$', ''))
+                        latest_ca_price_forprint = f'{latest_ca_price:.20f}'
+                        fake_buy_token = True
                     except ValueError:
                         print(Fore.YELLOW + f'{latest_ca_name} has an unstable price, skipping price')
                         latest_ca_price = 'N/A'
+                        fake_buy_token = False
 
-                    latest_ca_price_forprint = f'{latest_ca_price:.20f}'
-                    fake_buy_token = True
                 except selenium.common.exceptions.TimeoutException:
                     latest_ca_price, latest_ca_price_forprint = 'N/A', 'N/A'
                     fake_buy_token = False
