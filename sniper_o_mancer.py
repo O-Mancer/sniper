@@ -317,7 +317,10 @@ class SniperOMancer:
                 ca_index = self.database.index[self.database['Contract'] == ca].tolist()[0]
             else:
                 ca_index = index_n
-            rugcheck_v = int(self.database['Rugcheck alerts'][ca_index])
+            try:
+                rugcheck_v = int(self.database['Rugcheck alerts'][ca_index])
+            except ValueError:
+                rugcheck_v = 999999999999999999999999999
             honeypot_v = str(self.database['Honeypot'][ca_index])
             if rugcheck_v < self.maximum_alerts and honeypot_v == 'False':
                 self.fake_buy_database.loc[len(self.fake_buy_database.index)] = [ca_name, ca, entry_price, None]
