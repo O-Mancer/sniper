@@ -51,6 +51,8 @@ class SniperOMancer:
         self.scraper_sleep_time = 20
         self.updater_sleep_time = 5
         self.maximum_alerts = 4
+        self.maximum_database_index = 100
+        self.maximum_sell_tax = 30
 
         self.fake_mode = True
         self.fake_mode_sleep = 5
@@ -186,7 +188,7 @@ class SniperOMancer:
                         buy_tax = float(buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
                         sell_tax = float(sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
 
-                    if sell_tax >= 30:
+                    if sell_tax >= self.maximum_sell_tax:
                         latest_ca_honeypot = True
                         if latest_ca not in self.exclude_list:
                             self.exclude_list.append(latest_ca)
@@ -261,9 +263,9 @@ class SniperOMancer:
                 time.sleep(self.scraper_sleep_time)
 
     def updater(self, info):
-        if info == 'price':
-            while True:
-                if len(self.database['Contract']) > 0:
+        while len(self.database['Contract']) > 0:
+            if info == 'price':
+                while True:
                     for i in range(len(self.database['Contract'])):
                         current_contract = self.database['Contract'][i]
                         price_update_link = f'https://poocoin.app/tokens/{current_contract}'
@@ -300,9 +302,8 @@ class SniperOMancer:
                                 self.database['Price'][i] = 'N/A'
                             time.sleep(self.updater_sleep_time)
 
-        elif info == 'honeypot':
-            while True:
-                if len(self.database['Contract']) > 1:
+            elif info == 'honeypot':
+                while True:
                     for i in range(len(self.database['Contract'])):
                         current_contract = self.database['Contract'][i]
                         ca_name = self.database['Name'][i]
@@ -334,7 +335,7 @@ class SniperOMancer:
                             self.database['Buy Tax'][i] = buy_tax
                             self.database['Sell Tax'][i] = sell_tax
 
-                            if sell_tax <= 30:
+                            if sell_tax <= self.maximum_sell_tax:
                                 if self.database['Honeypot'][i] is True and self.database['Honeypot'][i] == 'N/A':
                                     print(Fore.GREEN + f'CA {current_contract} just lost its honeypot!')
                                     self.database['Honeypot'][i] = False
@@ -353,10 +354,11 @@ class SniperOMancer:
 
     def token_watcher(self, ca, ca_name):
         fake_token_holding = True
-        fake_ca_database_index = self.database.index[self.database['Contract'] == ca].tolist()[0]
-        fake_ca_fake_buy_index = self.fake_buy_database.index[self.fake_buy_database['Contract'] == ca].tolist()[0]
         while True:
             if self.fake_buy_database['Contract'][fake_ca_fake_buy_index] not in self.exclude_list:
+                fake_ca_database_index = self.database.index[self.database['Contract'] == ca].tolist()[0]
+                fake_ca_fake_buy_index = self.fake_buy_database.index[self.fake_buy_database['Contract'] == ca].tolist()[0]
+
                 current_bought_price = self.database['Price'][fake_ca_database_index]
                 remove_ca_name = self.fake_buy_database['Name'][fake_ca_fake_buy_index]
 
@@ -430,7 +432,7 @@ class SniperOMancer:
         print("\n\n")
         cprint(figlet_format(f'Sniper-O-Mancer', font='cosmic', width=150, justify="left"),
                'yellow')
-        print(Fore.CYAN + '\n                                                       v0.0.3 Alpha')
+        print(Fore.CYAN + '\n                                                       v0.0.4 Alpha')
         print(Fore.YELLOW + "                                                     Coded by yosharu")
         print(
             Fore.RED + "                                    THIS SNIPER WAS MADE TO BE USED UNDER CLOSE SUPERVISION! \n                    ANYONE INVOLVED IN THE DEVELOPMENT OF SoM ARE NOT LIABLE FOR ANY LOSSES OCCURED UNDER USE!\n                                      BY USING THIS SNIPER, YOU AGREE TO THESE TERMS.")
@@ -453,6 +455,10 @@ class SniperOMancer:
                     n_uptime = getuptime()
                     print(
                         f'\n{Fore.CYAN}---------------------------------------------------------------------------------------------------------------------------------------------------------\n{Fore.YELLOW}Overview:\nBalance: {Fore.WHITE}{self.fake_balance} BNB\n\n{Fore.YELLOW}Database:{Fore.WHITE}\n{self.database}\n\n{Fore.YELLOW}Currently fake holding:\n{Fore.WHITE}{self.fake_buy_current_list}\n\n{Fore.YELLOW}System:{Fore.WHITE}\nUptime: {n_uptime}\n{Fore.CYAN}---------------------------------------------------------------------------------------------------------------------------------------------------------\n')
+                    if len(self.database.index) >= self.maximum_database_index:
+                        print(Fore.RED + f'Index above {self.maximum_database_index}, purging tokens not held...')
+                        self.database = self.database[self.database['Name'].isin(self.fake_buy_current_list)]
+                        print(Fore.RED + 'Done')
                     time.sleep(60)
                 else:
                     time.sleep(2)
