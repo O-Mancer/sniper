@@ -25,6 +25,8 @@ startTime = time.time()
 init(autoreset=True, strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
 
 
+# HELPER FUNCTIONS
+
 # Get the uptime
 def getuptime():
     """
@@ -33,6 +35,11 @@ def getuptime():
     # do return startTime if you just want the process start time
     n = int(time.time() - startTime)
     return str(datetime.timedelta(seconds=n))
+
+
+# simple percentage func to help
+def percentage(percent, whole):
+    return (percent * whole) / 100.0
 
 
 class SniperOMancer:
@@ -51,6 +58,7 @@ class SniperOMancer:
         self.fake_buy = 1
         self.takeprofit_x = 2
         self.stoploss_x = 2
+        self.transaction_fee = 0.00088025
 
         # INIT
         pd.set_option("display.precision", 16)
@@ -74,7 +82,9 @@ class SniperOMancer:
         self.inoperation = None
         self.jewarch_url = 'http://70.34.213.32'
         self.honeypot_url = 'https://honeypot.is/?address='
-        self.database = pd.DataFrame(columns=['Name', 'Contract', 'Price', 'Rugcheck alerts', 'Honeypot', 'LP Lock', 'Ownership renounced', 'Excluded'])
+        self.database = pd.DataFrame(
+            columns=['Name', 'Contract', 'Price', 'Buy Tax', 'Sell Tax', 'Honeypot', 'Rugcheck Alerts', 'LP Lock',
+                     'Ownership Renounced', 'Excluded', 'Xs'])
         self.fake_buy_database = pd.DataFrame(columns=['Name', 'Contract', 'Entry', 'Current'])
         self.fake_buy_current_list = []
         self.exclude_list = []
@@ -83,11 +93,19 @@ class SniperOMancer:
         while True:
             self.inoperation = True
             print(Fore.YELLOW + '\nScraping newest jewarch CA...')
-            self.newest_ca_driver.get(self.jewarch_url)
-            latest_ca = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
-                EC.visibility_of_element_located((
-                    By.XPATH,
-                    "/html/body/div/div[2]/div/div[2]/div[1]/div[3]/div/div/div/table/tbody/tr[1]/td[4]/div/a[2]")))
+            try:
+                self.newest_ca_driver.get(self.jewarch_url)
+                latest_ca = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                    EC.visibility_of_element_located((
+                        By.XPATH,
+                        "/html/body/div/div[2]/div/div[2]/div[1]/div[3]/div/div/div/table/tbody/tr[1]/td[4]/div/a[2]")))
+            except selenium.common.exceptions.TimeoutException:
+                self.newest_ca_driver.get(self.jewarch_url)
+                latest_ca = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                    EC.visibility_of_element_located((
+                        By.XPATH,
+                        "/html/body/div/div[2]/div/div[2]/div[1]/div[3]/div/div/div/table/tbody/tr[1]/td[4]/div/a[2]")))
+
             latest_ca_link = latest_ca.get_attribute('href')
             latest_ca = latest_ca.get_attribute('href').replace('https://poocoin.app/tokens/', '')
 
@@ -141,32 +159,58 @@ class SniperOMancer:
                         latest_ca_ownership = False
 
                 except selenium.common.exceptions.TimeoutException:
-                    latest_ca_ownership = 'N/A'
+                    latest_ca_ownership = False
 
-                # Honeypot
+                # Honeypot and Tax
                 try:
                     honeypot_url_ca = f'{self.honeypot_url}{latest_ca}'
                     self.newest_ca_driver.get(honeypot_url_ca)
-                    honeypot_result = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                    tax = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
                         EC.visibility_of_element_located((By.XPATH,
-                                                          "/html/body/div[2]/div[1]/div/div")))
-                    if honeypot_result.text == 'Does not seem like a honeypot.':
-                        latest_ca_honeypot = False
-                    else:
-                        latest_ca_honeypot = True
+                                                          "/html/body/div[2]/div[1]/div/p[5]")))
 
+                    try:
+                        buy_tax = tax.text.split('%', 1)[0]
+                        sell_tax = tax.text.split('%', 1)[1]
+
+                        buy_tax = float(buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
+                        sell_tax = float(sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
+                    except IndexError:
+                        tax = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                            EC.visibility_of_element_located((By.XPATH,
+                                                              "/html/body/div[2]/div[1]/div/p[8]")))
+
+                        buy_tax = tax.text.split('%', 1)[0]
+                        sell_tax = tax.text.split('%', 1)[1]
+
+                        buy_tax = float(buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
+                        sell_tax = float(sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
+
+                    if sell_tax >= 30:
+                        latest_ca_honeypot = True
                         if latest_ca not in self.exclude_list:
                             self.exclude_list.append(latest_ca)
+                    else:
+                        latest_ca_honeypot = False
+
                 except selenium.common.exceptions.TimeoutException:
-                    latest_ca_honeypot = 'N/A'
+                    latest_ca_honeypot, buy_tax, sell_tax = 'N/A', 'N/A', 'N/A'
 
                 self.newest_ca_driver.get(latest_ca_link)
 
-                latest_ca_name = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
-                    EC.visibility_of_element_located((
-                        By.XPATH,
-                        "/html/body/div[1]/div/div[1]/div[2]/div/div[2]/div[1]/div[1]/div/div[1]/div/h1"))).text
-                latest_ca_name = latest_ca_name.split(' (', 1)[0]
+                try:
+                    latest_ca_name = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                        EC.visibility_of_element_located((
+                            By.XPATH,
+                            "/html/body/div[1]/div/div[1]/div[2]/div/div[2]/div[1]/div[1]/div/div[1]/div/h1"))).text
+                    latest_ca_name = latest_ca_name.split(' (', 1)[0]
+                except selenium.common.exceptions.TimeoutException:
+                    self.newest_ca_driver.get(latest_ca_link)
+                    latest_ca_name = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                        EC.visibility_of_element_located((
+                            By.XPATH,
+                            "/html/body/div[1]/div/div[1]/div[2]/div/div[2]/div[1]/div[1]/div/div[1]/div/h1"))).text
+                    latest_ca_name = latest_ca_name.split(' (', 1)[0]
 
                 # Price
                 try:
@@ -195,12 +239,16 @@ class SniperOMancer:
                 else:
                     excluded = False
 
+                print(Fore.CYAN + '\n----------------------------------------------')
+                print(Fore.BLUE + 'NEW TOKEN')
                 print(
-                    Fore.GREEN + f'Name: {latest_ca_name} | CA: {latest_ca} | Price: {latest_ca_price_forprint} | Rugcheck alerts: {alert_number} | Honeypot: {latest_ca_honeypot} | LP Lock: {latest_ca_lplock} | Ownership renounced: {latest_ca_ownership}')
+                    Fore.GREEN + f'Name: {Fore.WHITE}{latest_ca_name} \n{Fore.GREEN}CA: {Fore.WHITE}{latest_ca} \n{Fore.GREEN}Price: {Fore.WHITE}{latest_ca_price_forprint} \n{Fore.GREEN}Buy Tax: {Fore.WHITE}{buy_tax} \n{Fore.GREEN}Sell Tax: {Fore.WHITE}{sell_tax} \n{Fore.GREEN}Rugcheck Alerts: {Fore.WHITE}{alert_number} \n{Fore.GREEN}Honeypot: {Fore.WHITE}{latest_ca_honeypot} \n{Fore.GREEN}LP Lock: {Fore.WHITE}{latest_ca_lplock} \n{Fore.GREEN}Ownership renounced: {Fore.WHITE}{latest_ca_ownership}')
+                print(Fore.CYAN + '----------------------------------------------')
 
-                self.database.loc[len(self.database.index)] = [latest_ca_name, latest_ca, latest_ca_price,
-                                                               alert_number,
-                                                               latest_ca_honeypot, latest_ca_lplock, latest_ca_ownership, excluded]
+                self.database.loc[len(self.database.index)] = [latest_ca_name, latest_ca, latest_ca_price, buy_tax,
+                                                               sell_tax, latest_ca_honeypot,
+                                                               alert_number, latest_ca_lplock, latest_ca_ownership,
+                                                               excluded, None]
                 print(Fore.YELLOW + f'\nAdded {latest_ca_name} to database...')
 
                 if fake_buy_token:
@@ -235,7 +283,7 @@ class SniperOMancer:
                                     print(Fore.YELLOW + f'{ca_name} has an unstable price, skipping price')
                                     ca_price = 'N/A'
 
-                                if self.database['Price'][i] == 'N/A':
+                                if self.database['Price'][i] == 'N/A' and ca_price != 'N/A':
                                     print(Fore.GREEN + f'Liquidity added to CA {ca_name}!')
                                     fake_buy_token = True
                                 else:
@@ -244,7 +292,8 @@ class SniperOMancer:
 
                                 if fake_buy_token:
                                     t5 = threading.Thread(target=self.tx_handler,
-                                                          args=(self.database['Name'][i], current_contract, ca_price, i,),
+                                                          args=(
+                                                          self.database['Name'][i], current_contract, ca_price, i,),
                                                           daemon=True)
                                     t5.start()
                             except selenium.common.exceptions.TimeoutException:
@@ -261,10 +310,31 @@ class SniperOMancer:
                         try:
                             honeypot_url_ca = f'{self.honeypot_url}{current_contract}'
                             self.honeypot_updater_driver.get(honeypot_url_ca)
-                            honeypot_result = WebDriverWait(self.honeypot_updater_driver, self.max_scraper_wait).until(
-                                EC.visibility_of_element_located((By.XPATH,
-                                                                  "/html/body/div[2]/div[1]/div/div")))
-                            if honeypot_result.text == 'Does not seem like a honeypot.':
+
+                            try:
+                                tax = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                                    EC.visibility_of_element_located((By.XPATH,
+                                                                      "/html/body/div[2]/div[1]/div/p[5]")))
+                                buy_tax = tax.text.split('%', 1)[0]
+                                sell_tax = tax.text.split('%', 1)[1]
+
+                                buy_tax = float(buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
+                                sell_tax = float(sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
+                            except IndexError:
+                                tax = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                                    EC.visibility_of_element_located((By.XPATH,
+                                                                      "/html/body/div[2]/div[1]/div/p[8]")))
+
+                                buy_tax = tax.text.split('%', 1)[0]
+                                sell_tax = tax.text.split('%', 1)[1]
+
+                                buy_tax = float(buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
+                                sell_tax = float(sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
+
+                            self.database['Buy Tax'][i] = buy_tax
+                            self.database['Sell Tax'][i] = sell_tax
+
+                            if sell_tax <= 30:
                                 if self.database['Honeypot'][i] is True and self.database['Honeypot'][i] == 'N/A':
                                     print(Fore.GREEN + f'CA {current_contract} just lost its honeypot!')
                                     self.database['Honeypot'][i] = False
@@ -275,6 +345,8 @@ class SniperOMancer:
                                     print(Fore.RED + f'CA {ca_name} just became a honeypot!')
                                     if current_contract not in self.exclude_list:
                                         self.exclude_list.append(current_contract)
+
+
                         except selenium.common.exceptions.TimeoutException:
                             self.database['Honeypot'][i] = 'N/A'
                     time.sleep(self.updater_sleep_time)
@@ -287,24 +359,38 @@ class SniperOMancer:
             if self.fake_buy_database['Contract'][fake_ca_fake_buy_index] not in self.exclude_list:
                 current_bought_price = self.database['Price'][fake_ca_database_index]
                 remove_ca_name = self.fake_buy_database['Name'][fake_ca_fake_buy_index]
-                if current_bought_price > self.fake_buy_database['Entry'][fake_ca_fake_buy_index] * self.takeprofit_x:
+
+                x_since_entry = self.database['Price'][fake_ca_database_index] / self.fake_buy_database['Entry'][fake_ca_fake_buy_index]
+                self.database['Xs'][fake_ca_database_index] = x_since_entry
+                sell_tax = float(self.database['Buy Tax'][fake_ca_database_index])
+                sell_tax_takeprofitx = percentage(sell_tax, self.takeprofit_x)
+                sell_tax_stoplossx = percentage(sell_tax, self.stoploss_x)
+                takeprofit = self.takeprofit_x+sell_tax_takeprofitx
+                stoploss = self.stoploss_x+sell_tax_stoplossx
+
+                if current_bought_price > float(self.fake_buy_database['Entry'][fake_ca_fake_buy_index]) * takeprofit:
                     fake_token_holding = False
-                    profit_from_buy = self.fake_buy
-                    self.fake_balance = self.fake_balance + profit_from_buy
+                    profit_from_buy = self.fake_buy * self.takeprofit_x
+                    profit_from_buy = profit_from_buy - percentage(sell_tax, profit_from_buy)
+                    self.fake_balance = self.fake_balance + (profit_from_buy - self.transaction_fee)
                     try:
                         self.fake_buy_current_list.remove(remove_ca_name)
                     except ValueError:
                         pass
-                    print(Fore.GREEN + f'{ca_name} fake sold at a {self.takeprofit_x}x profit! Balance: {self.fake_balance} BNB')
-                elif current_bought_price < self.fake_buy_database['Entry'][fake_ca_fake_buy_index] / self.stoploss_x:
+                    print(
+                        Fore.GREEN + f'{ca_name} fake sold at a {self.takeprofit_x}x profit! Balance: {self.fake_balance} BNB')
+                    break
+                elif current_bought_price < float(self.fake_buy_database['Entry'][fake_ca_fake_buy_index]) / stoploss:
                     fake_token_holding = False
                     profit_from_buy = self.fake_buy / self.stoploss_x
-                    self.fake_balance = self.fake_balance - profit_from_buy
+                    self.fake_balance = self.fake_balance - (profit_from_buy + self.transaction_fee)
                     try:
                         self.fake_buy_current_list.remove(remove_ca_name)
                     except ValueError:
                         pass
-                    print(Fore.RED + f'{ca_name} fake sold at a -{self.stoploss_x}x loss! Balance: {self.fake_balance} BNB')
+                    print(
+                        Fore.RED + f'{ca_name} fake sold at a -{self.stoploss_x}x loss! Balance: {self.fake_balance} BNB')
+                    break
                 else:
                     time.sleep(self.fake_mode_sleep)
             else:
@@ -318,30 +404,34 @@ class SniperOMancer:
             else:
                 ca_index = index_n
             try:
-                rugcheck_v = int(self.database['Rugcheck alerts'][ca_index])
+                rugcheck_v = int(self.database['Rugcheck Alerts'][ca_index])
             except ValueError:
                 rugcheck_v = 999999999999999999999999999
             honeypot_v = str(self.database['Honeypot'][ca_index])
             if rugcheck_v < self.maximum_alerts and honeypot_v == 'False':
+                buy_tax = float(self.database['Buy Tax'][ca_index])
+
                 self.fake_buy_database.loc[len(self.fake_buy_database.index)] = [ca_name, ca, entry_price, None]
                 self.fake_buy_current_list.append(ca_name)
-                self.fake_balance = self.fake_balance - self.fake_buy
-                print(Fore.BLUE + f'\nFake bought {ca_name}, watching token for sell point...')
+                self.fake_balance = self.fake_balance - (self.fake_buy + self.transaction_fee)
+                actual_fake_buy = self.fake_buy - percentage(buy_tax, self.fake_buy)
+
+                print(Fore.BLUE + f'\nFake bought {ca_name} for {self.fake_buy} BNB (with tax: {actual_fake_buy} BNB), watching token for sell point...')
                 t4 = threading.Thread(target=self.token_watcher, args=(ca, ca_name,), daemon=True)
                 t4.start()
-            elif rugcheck_v > self.maximum_alerts:
+            elif rugcheck_v > self.maximum_alerts and rugcheck_v != 999999999999999999999999999:
                 print(Fore.RED + f'\n{ca_name} has too many rugcheck alerts and token was not bought!')
             elif honeypot_v == 'True':
                 print(Fore.RED + f'\n{ca_name} is a honeypot and token was not bought!')
             else:
-                print(Fore.CYAN + 'Not enough info to decide to buy token')
+                print(Fore.CYAN + '\nNot enough info to decide to buy token')
 
     def run(self):
         print("\n\n")
         cprint(figlet_format(f'Sniper-O-Mancer', font='cosmic', width=150, justify="left"),
                'yellow')
-        print(Fore.CYAN + '\n                                                       v0.0.2 Alpha')
-        print(Fore.YELLOW + "                                                    Coded by yosharu.")
+        print(Fore.CYAN + '\n                                                       v0.0.3 Alpha')
+        print(Fore.YELLOW + "                                                     Coded by yosharu")
         print(
             Fore.RED + "                                    THIS SNIPER WAS MADE TO BE USED UNDER CLOSE SUPERVISION! \n                    ANYONE INVOLVED IN THE DEVELOPMENT OF SoM ARE NOT LIABLE FOR ANY LOSSES OCCURED UNDER USE!\n                                      BY USING THIS SNIPER, YOU AGREE TO THESE TERMS.")
         try:
@@ -362,11 +452,11 @@ class SniperOMancer:
                 if self.inoperation is False:
                     n_uptime = getuptime()
                     print(
-                        f'\n{Fore.CYAN}-------------------------------------------------------------------\n{Fore.YELLOW}Overview:\nBalance: {Fore.WHITE}{self.fake_balance} BNB\n\n{Fore.YELLOW}Database:{Fore.WHITE}\n{self.database}\n\n{Fore.YELLOW}Currently fake holding:\n{Fore.WHITE}{self.fake_buy_current_list}\n\n{Fore.YELLOW}System:{Fore.WHITE}\nUptime: {n_uptime}\n{Fore.CYAN}-------------------------------------------------------------------')
+                        f'\n{Fore.CYAN}---------------------------------------------------------------------------------------------------------------------------------------------------------\n{Fore.YELLOW}Overview:\nBalance: {Fore.WHITE}{self.fake_balance} BNB\n\n{Fore.YELLOW}Database:{Fore.WHITE}\n{self.database}\n\n{Fore.YELLOW}Currently fake holding:\n{Fore.WHITE}{self.fake_buy_current_list}\n\n{Fore.YELLOW}System:{Fore.WHITE}\nUptime: {n_uptime}\n{Fore.CYAN}---------------------------------------------------------------------------------------------------------------------------------------------------------\n')
                     time.sleep(60)
                 else:
                     time.sleep(2)
-        except KeyboardInterrupt:
+        except KeyboardInterrupt or Exception:
             print(Fore.RED + '\nGoodbye.')
 
             # Simply .quit() didn't work on my system, so here i'm manually killing the Chrome windows with PIDs and task kill
