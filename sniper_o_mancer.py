@@ -338,6 +338,10 @@ class SniperOMancer:
                             honeypot_url_ca = f'{self.honeypot_url}{current_contract}'
                             self.honeypot_updater_driver.get(honeypot_url_ca)
 
+                            honeypot_ornot = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                                EC.visibility_of_element_located((By.XPATH,
+                                                                  "/html/body/div[2]/div[1]/div/div")))
+
                             try:
                                 tax = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
                                     EC.visibility_of_element_located((By.XPATH,
@@ -361,7 +365,7 @@ class SniperOMancer:
                             self.database['Buy Tax'][i] = buy_tax
                             self.database['Sell Tax'][i] = sell_tax
 
-                            if sell_tax <= self.maximum_sell_tax:
+                            if sell_tax <= self.maximum_sell_tax or honeypot_ornot.text == 'Yup, honeypot. Run the fuck away.':
                                 if self.database['Honeypot'][i] is True and self.database['Honeypot'][i] == 'N/A':
                                     print(Fore.GREEN + f'CA {current_contract} just lost its honeypot!')
                                     self.database['Honeypot'][i] = False
