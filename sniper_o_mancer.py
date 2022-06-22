@@ -114,8 +114,12 @@ class SniperOMancer:
                 print(Fore.RED + 'Jewarch is down, waiting 60s to retry.')
                 latest_ca = get_latest_ca_func()
 
-            latest_ca_link = latest_ca.get_attribute('href')
-            latest_ca = latest_ca.get_attribute('href').replace('https://poocoin.app/tokens/', '')
+            try:
+                latest_ca_link = latest_ca.get_attribute('href')
+                latest_ca = latest_ca.get_attribute('href').replace('https://poocoin.app/tokens/', '')
+            except AttributeError:
+                print(Fore.RED + 'JewArch grabbing failed after 3 attempts, exiting...')
+                quit()
 
             if len(self.database['Contract']) > 0 and latest_ca in self.database["Contract"].values:
                 print(Fore.CYAN + 'Contract already in database, continuing...')
@@ -192,6 +196,10 @@ class SniperOMancer:
                         EC.visibility_of_element_located((By.XPATH,
                                                           "/html/body/div[2]/div[1]/div/p[5]")))
 
+                    honeypot_ornot = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                        EC.visibility_of_element_located((By.XPATH,
+                                                          "/html/body/div[2]/div[1]/div/div")))
+
                     try:
                         buy_tax = tax.text.split('%', 1)[0]
                         sell_tax = tax.text.split('%', 1)[1]
@@ -209,7 +217,7 @@ class SniperOMancer:
                         buy_tax = float(buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
                         sell_tax = float(sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
 
-                    if sell_tax >= self.maximum_sell_tax:
+                    if sell_tax >= self.maximum_sell_tax or honeypot_ornot.text == 'Yup, honeypot. Run the fuck away.':
                         latest_ca_honeypot = True
                         if latest_ca not in self.exclude_list:
                             self.exclude_list.append(latest_ca)
