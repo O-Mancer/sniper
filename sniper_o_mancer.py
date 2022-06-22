@@ -50,6 +50,7 @@ class SniperOMancer:
         self.max_scraper_wait = 4
         self.scraper_sleep_time = 20
         self.updater_sleep_time = 5
+        self.overview_sleep_time = 60
         self.maximum_alerts = 4
         self.maximum_database_index = 100
         self.maximum_sell_tax = 30
@@ -85,7 +86,7 @@ class SniperOMancer:
         self.jewarch_url = 'http://70.34.213.32'
         self.honeypot_url = 'https://honeypot.is/?address='
         self.database = pd.DataFrame(
-            columns=['Name', 'Contract', 'Price', 'Buy Tax', 'Sell Tax', 'Honeypot', 'Rugcheck Alerts', 'LP Lock',
+            columns=['Name', 'Contract', 'Price', 'Buy Tax', 'Sell Tax', 'Honeypot', 'Rugcheck Alerts', 'Scam', 'LP Lock',
                      'Ownership Renounced', 'Excluded', 'Xs'])
         self.fake_buy_database = pd.DataFrame(columns=['Name', 'Contract', 'Entry', 'Current'])
         self.fake_buy_current_list = []
@@ -95,18 +96,23 @@ class SniperOMancer:
         while True:
             self.inoperation = True
             print(Fore.YELLOW + '\nScraping newest jewarch CA...')
+
+            def get_latest_ca_func():
+                try:
+                    self.newest_ca_driver.get(self.jewarch_url)
+                    latest_ca = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                        EC.visibility_of_element_located((
+                            By.XPATH,
+                            "/html/body/div/div[2]/div/div[2]/div[1]/div[3]/div/div/div/table/tbody/tr[1]/td[4]/div/a[2]")))
+                    return latest_ca
+                except selenium.common.exceptions.TimeoutException:
+                    get_latest_ca_func()
+
             try:
-                self.newest_ca_driver.get(self.jewarch_url)
-                latest_ca = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
-                    EC.visibility_of_element_located((
-                        By.XPATH,
-                        "/html/body/div/div[2]/div/div[2]/div[1]/div[3]/div/div/div/table/tbody/tr[1]/td[4]/div/a[2]")))
+                latest_ca = get_latest_ca_func()
             except selenium.common.exceptions.TimeoutException:
-                self.newest_ca_driver.get(self.jewarch_url)
-                latest_ca = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
-                    EC.visibility_of_element_located((
-                        By.XPATH,
-                        "/html/body/div/div[2]/div/div[2]/div[1]/div[3]/div/div/div/table/tbody/tr[1]/td[4]/div/a[2]")))
+                print(Fore.RED + 'Jewarch is down, waiting 60s to retry.')
+                latest_ca = get_latest_ca_func()
 
             latest_ca_link = latest_ca.get_attribute('href')
             latest_ca = latest_ca.get_attribute('href').replace('https://poocoin.app/tokens/', '')
@@ -124,16 +130,31 @@ class SniperOMancer:
                         EC.visibility_of_element_located((By.XPATH,
                                                           "/html/body/div/div[2]/div/div[2]/div[1]/div[3]/div/div/div/table/tbody/tr[1]/td[3]/div/a")))
                     latest_ca_button.click()
-                    rugcheck = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
-                        EC.visibility_of_element_located((By.XPATH,
-                                                          "/html/body/div[2]/div[1]/div/div/div/div/div[2]/button[4]/div/div/span")))
+                    try:
+                        rugcheck = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                            EC.visibility_of_element_located((By.XPATH,
+                                                              "/html/body/div[2]/div[1]/div/div/div/div/div[2]/button[4]/div/div/span")))
 
-                    alert_number = int(rugcheck.text)
-                    if alert_number > self.maximum_alerts:
-                        self.exclude_list.append(latest_ca)
+                        alert_number = int(rugcheck.text)
+                        if alert_number > self.maximum_alerts:
+                            self.exclude_list.append(latest_ca)
+                        is_scam = False
+                    except selenium.common.exceptions.TimeoutException:
+                        rugcheck = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                            EC.visibility_of_element_located((By.XPATH,
+                                                              "/html/body/div[2]/div[1]/div/div/div/div/div[2]/button[4]/div/span")))
+                        if rugcheck.get_attribute("title") == 'Moonarch rugcheck found suspicious code in the token contract':
+                            alert_number = 'N/A'
+                            is_scam = True
+                            if latest_ca not in self.exclude_list:
+                                self.exclude_list.append(latest_ca)
+                        else:
+                            alert_number = 'N/A'
+                            is_scam = False
 
                 except selenium.common.exceptions.TimeoutException:
                     alert_number = 'N/A'
+                    is_scam = 'N/A'
 
                 # LP Lock
                 try:
@@ -208,11 +229,8 @@ class SniperOMancer:
                     latest_ca_name = latest_ca_name.split(' (', 1)[0]
                 except selenium.common.exceptions.TimeoutException:
                     self.newest_ca_driver.get(latest_ca_link)
-                    latest_ca_name = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
-                        EC.visibility_of_element_located((
-                            By.XPATH,
-                            "/html/body/div[1]/div/div[1]/div[2]/div/div[2]/div[1]/div[1]/div/div[1]/div/h1"))).text
-                    latest_ca_name = latest_ca_name.split(' (', 1)[0]
+                    latest_ca_name = self.newest_ca_driver.title
+                    latest_ca_name = latest_ca_name.split(' price', 1)[0]
 
                 # Price
                 try:
@@ -249,7 +267,7 @@ class SniperOMancer:
 
                 self.database.loc[len(self.database.index)] = [latest_ca_name, latest_ca, latest_ca_price, buy_tax,
                                                                sell_tax, latest_ca_honeypot,
-                                                               alert_number, latest_ca_lplock, latest_ca_ownership,
+                                                               alert_number, is_scam, latest_ca_lplock, latest_ca_ownership,
                                                                excluded, None]
                 print(Fore.YELLOW + f'\nAdded {latest_ca_name} to database...')
 
@@ -295,7 +313,7 @@ class SniperOMancer:
                                 if fake_buy_token:
                                     t5 = threading.Thread(target=self.tx_handler,
                                                           args=(
-                                                          self.database['Name'][i], current_contract, ca_price, i,),
+                                                              self.database['Name'][i], current_contract, ca_price, i,),
                                                           daemon=True)
                                     t5.start()
                             except selenium.common.exceptions.TimeoutException:
@@ -354,6 +372,8 @@ class SniperOMancer:
 
     def token_watcher(self, ca, ca_name):
         fake_token_holding = True
+        fake_ca_database_index = self.database.index[self.database['Contract'] == ca].tolist()[0]
+        fake_ca_fake_buy_index = self.fake_buy_database.index[self.fake_buy_database['Contract'] == ca].tolist()[0]
         while True:
             if self.fake_buy_database['Contract'][fake_ca_fake_buy_index] not in self.exclude_list:
                 fake_ca_database_index = self.database.index[self.database['Contract'] == ca].tolist()[0]
@@ -362,13 +382,14 @@ class SniperOMancer:
                 current_bought_price = self.database['Price'][fake_ca_database_index]
                 remove_ca_name = self.fake_buy_database['Name'][fake_ca_fake_buy_index]
 
-                x_since_entry = self.database['Price'][fake_ca_database_index] / self.fake_buy_database['Entry'][fake_ca_fake_buy_index]
+                x_since_entry = self.database['Price'][fake_ca_database_index] / self.fake_buy_database['Entry'][
+                    fake_ca_fake_buy_index]
                 self.database['Xs'][fake_ca_database_index] = x_since_entry
                 sell_tax = float(self.database['Buy Tax'][fake_ca_database_index])
                 sell_tax_takeprofitx = percentage(sell_tax, self.takeprofit_x)
                 sell_tax_stoplossx = percentage(sell_tax, self.stoploss_x)
-                takeprofit = self.takeprofit_x+sell_tax_takeprofitx
-                stoploss = self.stoploss_x+sell_tax_stoplossx
+                takeprofit = self.takeprofit_x + sell_tax_takeprofitx
+                stoploss = self.stoploss_x + sell_tax_stoplossx
 
                 if current_bought_price > float(self.fake_buy_database['Entry'][fake_ca_fake_buy_index]) * takeprofit:
                     fake_token_holding = False
@@ -418,7 +439,8 @@ class SniperOMancer:
                 self.fake_balance = self.fake_balance - (self.fake_buy + self.transaction_fee)
                 actual_fake_buy = self.fake_buy - percentage(buy_tax, self.fake_buy)
 
-                print(Fore.BLUE + f'\nFake bought {ca_name} for {self.fake_buy} BNB (with tax: {actual_fake_buy} BNB), watching token for sell point...')
+                print(
+                    Fore.BLUE + f'\nFake bought {ca_name} for {self.fake_buy} BNB (with tax: {actual_fake_buy} BNB), watching token for sell point...')
                 t4 = threading.Thread(target=self.token_watcher, args=(ca, ca_name,), daemon=True)
                 t4.start()
             elif rugcheck_v > self.maximum_alerts and rugcheck_v != 999999999999999999999999999:
@@ -437,7 +459,7 @@ class SniperOMancer:
         print(
             Fore.RED + "                                    THIS SNIPER WAS MADE TO BE USED UNDER CLOSE SUPERVISION! \n                    ANYONE INVOLVED IN THE DEVELOPMENT OF SoM ARE NOT LIABLE FOR ANY LOSSES OCCURED UNDER USE!\n                                      BY USING THIS SNIPER, YOU AGREE TO THESE TERMS.")
         try:
-            print(Fore.CYAN + 'Starting threads...')
+            print(Fore.CYAN + '\nStarting threads...')
             t1 = threading.Thread(target=self.scrape_newest_ca, daemon=True)
 
             # updater
@@ -447,7 +469,7 @@ class SniperOMancer:
             t1.start()
             t2.start()
             t3.start()
-            print(Fore.CYAN + 'Threads started')
+            print(Fore.CYAN + '\nThreads started')
 
             time.sleep(5)
             while True:
@@ -459,7 +481,7 @@ class SniperOMancer:
                         print(Fore.RED + f'Index above {self.maximum_database_index}, purging tokens not held...')
                         self.database = self.database[self.database['Name'].isin(self.fake_buy_current_list)]
                         print(Fore.RED + 'Done')
-                    time.sleep(60)
+                    time.sleep(self.overview_sleep_time)
                 else:
                     time.sleep(2)
         except KeyboardInterrupt or Exception:
