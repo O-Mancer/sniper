@@ -47,13 +47,13 @@ class SniperOMancer:
         # SETTINGS
         self.wallet_address = ''
         self.private_key = ''
-        self.max_scraper_wait = 4
+        self.max_scraper_wait = 5
         self.scraper_sleep_time = 20
         self.updater_sleep_time = 5
         self.overview_sleep_time = 60
         self.maximum_alerts = 4
-        self.maximum_database_index = 100
-        self.maximum_sell_tax = 30
+        self.maximum_database_index = 40
+        self.maximum_sell_tax = 20
 
         self.fake_mode = True
         self.fake_mode_sleep = 5
@@ -86,7 +86,8 @@ class SniperOMancer:
         self.jewarch_url = 'http://70.34.213.32'
         self.honeypot_url = 'https://honeypot.is/?address='
         self.database = pd.DataFrame(
-            columns=['Name', 'Contract', 'Price', 'Buy Tax', 'Sell Tax', 'Honeypot', 'Rugcheck Alerts', 'Scam', 'LP Lock',
+            columns=['Name', 'Contract', 'Price', 'Buy Tax', 'Sell Tax', 'Honeypot', 'Rugcheck Alerts', 'Scam',
+                     'LP Lock',
                      'Ownership Renounced', 'Excluded', 'Xs'])
         self.fake_buy_database = pd.DataFrame(columns=['Name', 'Contract', 'Entry', 'Current'])
         self.fake_buy_current_list = []
@@ -147,7 +148,8 @@ class SniperOMancer:
                         rugcheck = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
                             EC.visibility_of_element_located((By.XPATH,
                                                               "/html/body/div[2]/div[1]/div/div/div/div/div[2]/button[4]/div/span")))
-                        if rugcheck.get_attribute("title") == 'Moonarch rugcheck found suspicious code in the token contract':
+                        if rugcheck.get_attribute(
+                                "title") == 'Moonarch rugcheck found suspicious code in the token contract':
                             alert_number = 'N/A'
                             is_scam = True
                             if latest_ca not in self.exclude_list:
@@ -275,7 +277,8 @@ class SniperOMancer:
 
                 self.database.loc[len(self.database.index)] = [latest_ca_name, latest_ca, latest_ca_price, buy_tax,
                                                                sell_tax, latest_ca_honeypot,
-                                                               alert_number, is_scam, latest_ca_lplock, latest_ca_ownership,
+                                                               alert_number, is_scam, latest_ca_lplock,
+                                                               latest_ca_ownership,
                                                                excluded, None]
                 print(Fore.YELLOW + f'\nAdded {latest_ca_name} to database...')
 
@@ -289,98 +292,100 @@ class SniperOMancer:
                 time.sleep(self.scraper_sleep_time)
 
     def updater(self, info):
-        while len(self.database['Contract']) > 0:
-            if info == 'price':
-                while True:
-                    for i in range(len(self.database['Contract'])):
-                        current_contract = self.database['Contract'][i]
-                        price_update_link = f'https://poocoin.app/tokens/{current_contract}'
-                        ca_name = self.database['Name'][i]
-                        if current_contract not in self.exclude_list:
-                            # Price
+        while True:
+            while len(self.database.index) > 0:
+                if info == 'price':
+                    while True:
+                        for i in range(len(self.database['Contract'])):
+                            current_contract = self.database['Contract'][i]
+                            price_update_link = f'https://poocoin.app/tokens/{current_contract}'
+                            ca_name = self.database['Name'][i]
+                            if current_contract not in self.exclude_list:
+                                # Price
+                                try:
+                                    self.price_updater_driver.get(price_update_link)
+                                    ca_price = WebDriverWait(self.price_updater_driver, self.max_scraper_wait).until(
+                                        EC.visibility_of_element_located((
+                                            By.XPATH,
+                                            "/html/body/div[1]/div/div[1]/div[2]/div/div[2]/div[1]/div[1]/div/div[1]/div/span")))
+
+                                    try:
+                                        ca_price = float(ca_price.text.replace('$', ''))
+                                    except ValueError:
+                                        print(Fore.YELLOW + f'{ca_name} has an unstable price, skipping price')
+                                        ca_price = 'N/A'
+
+                                    if self.database['Price'][i] == 'N/A' and ca_price != 'N/A':
+                                        print(Fore.GREEN + f'Liquidity added to CA {ca_name}!')
+                                        fake_buy_token = True
+                                    else:
+                                        fake_buy_token = False
+                                    self.database['Price'][i] = ca_price
+
+                                    if fake_buy_token:
+                                        t5 = threading.Thread(target=self.tx_handler,
+                                                              args=(
+                                                                  self.database['Name'][i], current_contract, ca_price, i,),
+                                                              daemon=True)
+                                        t5.start()
+                                except selenium.common.exceptions.TimeoutException:
+                                    self.database['Price'][i] = 'N/A'
+                                time.sleep(self.updater_sleep_time)
+
+                elif info == 'honeypot':
+                    while True:
+                        for i in range(len(self.database['Contract'])):
+                            current_contract = self.database['Contract'][i]
+                            ca_name = self.database['Name'][i]
+                            # Honeypot
                             try:
-                                self.price_updater_driver.get(price_update_link)
-                                ca_price = WebDriverWait(self.price_updater_driver, self.max_scraper_wait).until(
-                                    EC.visibility_of_element_located((
-                                        By.XPATH,
-                                        "/html/body/div[1]/div/div[1]/div[2]/div/div[2]/div[1]/div[1]/div/div[1]/div/span")))
+                                honeypot_url_ca = f'{self.honeypot_url}{current_contract}'
+                                self.honeypot_updater_driver.get(honeypot_url_ca)
+
+                                honeypot_ornot = WebDriverWait(self.honeypot_updater_driver, self.max_scraper_wait).until(
+                                    EC.visibility_of_element_located((By.XPATH,
+                                                                      "/html/body/div[2]/div[1]/div/div")))
 
                                 try:
-                                    ca_price = float(ca_price.text.replace('$', ''))
-                                except ValueError:
-                                    print(Fore.YELLOW + f'{ca_name} has an unstable price, skipping price')
-                                    ca_price = 'N/A'
+                                    tax = WebDriverWait(self.honeypot_updater_driver, self.max_scraper_wait).until(
+                                        EC.visibility_of_element_located((By.XPATH,
+                                                                          "/html/body/div[2]/div[1]/div/p[5]")))
+                                    buy_tax = tax.text.split('%', 1)[0]
+                                    sell_tax = tax.text.split('%', 1)[1]
 
-                                if self.database['Price'][i] == 'N/A' and ca_price != 'N/A':
-                                    print(Fore.GREEN + f'Liquidity added to CA {ca_name}!')
-                                    fake_buy_token = True
+                                    buy_tax = float(buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
+                                    sell_tax = float(sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
+                                except IndexError:
+                                    tax = WebDriverWait(self.honeypot_updater_driver, self.max_scraper_wait).until(
+                                        EC.visibility_of_element_located((By.XPATH,
+                                                                          "/html/body/div[2]/div[1]/div/p[8]")))
+
+                                    buy_tax = tax.text.split('%', 1)[0]
+                                    sell_tax = tax.text.split('%', 1)[1]
+
+                                    buy_tax = float(buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
+                                    sell_tax = float(sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
+
+                                self.database['Buy Tax'][i] = buy_tax
+                                self.database['Sell Tax'][i] = sell_tax
+
+                                if sell_tax <= self.maximum_sell_tax or honeypot_ornot.text == 'Yup, honeypot. Run the fuck away.':
+                                    if self.database['Honeypot'][i] is True and self.database['Honeypot'][i] == 'N/A':
+                                        print(Fore.GREEN + f'CA {current_contract} just lost its honeypot!')
+                                        self.database['Honeypot'][i] = False
+                                        self.exclude_list.remove(current_contract)
                                 else:
-                                    fake_buy_token = False
-                                self.database['Price'][i] = ca_price
+                                    if self.database['Honeypot'][i] is False:
+                                        self.database['Honeypot'][i] = True
+                                        print(Fore.RED + f'CA {ca_name} just became a honeypot!')
+                                        if current_contract not in self.exclude_list:
+                                            self.exclude_list.append(current_contract)
 
-                                if fake_buy_token:
-                                    t5 = threading.Thread(target=self.tx_handler,
-                                                          args=(
-                                                              self.database['Name'][i], current_contract, ca_price, i,),
-                                                          daemon=True)
-                                    t5.start()
                             except selenium.common.exceptions.TimeoutException:
-                                self.database['Price'][i] = 'N/A'
-                            time.sleep(self.updater_sleep_time)
-
-            elif info == 'honeypot':
-                while True:
-                    for i in range(len(self.database['Contract'])):
-                        current_contract = self.database['Contract'][i]
-                        ca_name = self.database['Name'][i]
-                        # Honeypot
-                        try:
-                            honeypot_url_ca = f'{self.honeypot_url}{current_contract}'
-                            self.honeypot_updater_driver.get(honeypot_url_ca)
-
-                            honeypot_ornot = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
-                                EC.visibility_of_element_located((By.XPATH,
-                                                                  "/html/body/div[2]/div[1]/div/div")))
-
-                            try:
-                                tax = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
-                                    EC.visibility_of_element_located((By.XPATH,
-                                                                      "/html/body/div[2]/div[1]/div/p[5]")))
-                                buy_tax = tax.text.split('%', 1)[0]
-                                sell_tax = tax.text.split('%', 1)[1]
-
-                                buy_tax = float(buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
-                                sell_tax = float(sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
-                            except IndexError:
-                                tax = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
-                                    EC.visibility_of_element_located((By.XPATH,
-                                                                      "/html/body/div[2]/div[1]/div/p[8]")))
-
-                                buy_tax = tax.text.split('%', 1)[0]
-                                sell_tax = tax.text.split('%', 1)[1]
-
-                                buy_tax = float(buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
-                                sell_tax = float(sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
-
-                            self.database['Buy Tax'][i] = buy_tax
-                            self.database['Sell Tax'][i] = sell_tax
-
-                            if sell_tax <= self.maximum_sell_tax or honeypot_ornot.text == 'Yup, honeypot. Run the fuck away.':
-                                if self.database['Honeypot'][i] is True and self.database['Honeypot'][i] == 'N/A':
-                                    print(Fore.GREEN + f'CA {current_contract} just lost its honeypot!')
-                                    self.database['Honeypot'][i] = False
-                                    self.exclude_list.remove(current_contract)
-                            else:
-                                if self.database['Honeypot'][i] is False:
-                                    self.database['Honeypot'][i] = True
-                                    print(Fore.RED + f'CA {ca_name} just became a honeypot!')
-                                    if current_contract not in self.exclude_list:
-                                        self.exclude_list.append(current_contract)
-
-
-                        except selenium.common.exceptions.TimeoutException:
-                            self.database['Honeypot'][i] = 'N/A'
-                    time.sleep(self.updater_sleep_time)
+                                self.database['Honeypot'][i] = 'N/A'
+                        time.sleep(self.updater_sleep_time)
+            else:
+                time.sleep(10)
 
     def token_watcher(self, ca, ca_name):
         fake_token_holding = True
@@ -389,7 +394,8 @@ class SniperOMancer:
         while True:
             if self.fake_buy_database['Contract'][fake_ca_fake_buy_index] not in self.exclude_list:
                 fake_ca_database_index = self.database.index[self.database['Contract'] == ca].tolist()[0]
-                fake_ca_fake_buy_index = self.fake_buy_database.index[self.fake_buy_database['Contract'] == ca].tolist()[0]
+                fake_ca_fake_buy_index = \
+                    self.fake_buy_database.index[self.fake_buy_database['Contract'] == ca].tolist()[0]
 
                 current_bought_price = self.database['Price'][fake_ca_database_index]
                 remove_ca_name = self.fake_buy_database['Name'][fake_ca_fake_buy_index]
@@ -466,7 +472,7 @@ class SniperOMancer:
         print("\n\n")
         cprint(figlet_format(f'Sniper-O-Mancer', font='cosmic', width=150, justify="left"),
                'yellow')
-        print(Fore.CYAN + '\n                                                       v0.0.4 Alpha')
+        print(Fore.CYAN + '\n                                                       v0.0.5 Alpha')
         print(Fore.YELLOW + "                                                     Coded by yosharu")
         print(
             Fore.RED + "                                    THIS SNIPER WAS MADE TO BE USED UNDER CLOSE SUPERVISION! \n                    ANYONE INVOLVED IN THE DEVELOPMENT OF SoM ARE NOT LIABLE FOR ANY LOSSES OCCURED UNDER USE!\n                                      BY USING THIS SNIPER, YOU AGREE TO THESE TERMS.")
