@@ -120,6 +120,13 @@ class SniperOMancer:
                 latest_ca = latest_ca.get_attribute('href').replace('https://poocoin.app/tokens/', '')
             except AttributeError:
                 print(Fore.RED + 'JewArch grabbing failed after 3 attempts, exiting...')
+                # Simply .quit() didn't work on my system, so here i'm manually killing the Chrome windows with PIDs and task kill
+                for process in psutil.process_iter():
+                    if process.name() == 'chrome.exe' and '--test-type=webdriver' in process.cmdline():
+                        with suppress(psutil.NoSuchProcess):
+                            self.kill_list.append(process.pid)
+                for proc_id in self.kill_list:
+                    os.kill(int(proc_id), signal.SIGTERM)
                 quit()
 
             if len(self.database['Contract']) > 0 and latest_ca in self.database["Contract"].values:
@@ -203,23 +210,23 @@ class SniperOMancer:
                                                           "/html/body/div[2]/div[1]/div/div")))
 
                     try:
-                        buy_tax = tax.text.split('%', 1)[0]
-                        sell_tax = tax.text.split('%', 1)[1]
-
-                        buy_tax = float(buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
-                        sell_tax = float(sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
-                    except IndexError:
                         tax = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
                             EC.visibility_of_element_located((By.XPATH,
-                                                              "/html/body/div[2]/div[1]/div/p[8]")))
-
+                                                              "/html/body/div[2]/div[1]/div/p[5]")))
                         buy_tax = tax.text.split('%', 1)[0]
                         sell_tax = tax.text.split('%', 1)[1]
 
-                        buy_tax = float(buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
-                        sell_tax = float(sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
+                        buy_tax = float(
+                            buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
+                        sell_tax = float(
+                            sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
+                    except selenium.common.exceptions.TimeoutException or IndexError:
+                        buy_tax, sell_tax = 'N/A', 'N/A'
+                        pass
 
-                    if sell_tax >= self.maximum_sell_tax or honeypot_ornot.text == 'Yup, honeypot. Run the fuck away.':
+                    print(honeypot_ornot.text)
+
+                    if honeypot_ornot.text == 'Yup, honeypot. Run the fuck away.' or sell_tax >= self.maximum_sell_tax:
                         latest_ca_honeypot = True
                         if latest_ca not in self.exclude_list:
                             self.exclude_list.append(latest_ca)
@@ -293,7 +300,7 @@ class SniperOMancer:
 
     def updater(self, info):
         while True:
-            while len(self.database.index) > 0:
+            if len(self.database.index) > 0:
                 if info == 'price':
                     while True:
                         for i in range(len(self.database['Contract'])):
@@ -325,7 +332,8 @@ class SniperOMancer:
                                     if fake_buy_token:
                                         t5 = threading.Thread(target=self.tx_handler,
                                                               args=(
-                                                                  self.database['Name'][i], current_contract, ca_price, i,),
+                                                                  self.database['Name'][i], current_contract, ca_price,
+                                                                  i,),
                                                               daemon=True)
                                         t5.start()
                                 except selenium.common.exceptions.TimeoutException:
@@ -342,9 +350,20 @@ class SniperOMancer:
                                 honeypot_url_ca = f'{self.honeypot_url}{current_contract}'
                                 self.honeypot_updater_driver.get(honeypot_url_ca)
 
-                                honeypot_ornot = WebDriverWait(self.honeypot_updater_driver, self.max_scraper_wait).until(
+                                honeypot_ornot = WebDriverWait(self.honeypot_updater_driver,
+                                                               self.max_scraper_wait).until(
                                     EC.visibility_of_element_located((By.XPATH,
                                                                       "/html/body/div[2]/div[1]/div/div")))
+
+                                if honeypot_ornot.text == 'Yup, honeypot. Run the fuck away.' and self.database['Honeypot'][i] == 'N/A':
+                                    self.database['Honeypot'][i] = True
+                                    self.database['Excluded'][i] = True
+                                    print(Fore.RED + f'{ca_name} just became a honeypot!')
+                                    if current_contract not in self.exclude_list:
+                                        self.exclude_list.append(current_contract)
+                                elif honeypot_ornot.text == 'Does not seem like a honeypot.':
+                                    self.database['Honeypot'][i] = False
+                                    self.database['Excluded'][i] = False
 
                                 try:
                                     tax = WebDriverWait(self.honeypot_updater_driver, self.max_scraper_wait).until(
@@ -353,33 +372,33 @@ class SniperOMancer:
                                     buy_tax = tax.text.split('%', 1)[0]
                                     sell_tax = tax.text.split('%', 1)[1]
 
-                                    buy_tax = float(buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
-                                    sell_tax = float(sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
-                                except IndexError:
-                                    tax = WebDriverWait(self.honeypot_updater_driver, self.max_scraper_wait).until(
-                                        EC.visibility_of_element_located((By.XPATH,
-                                                                          "/html/body/div[2]/div[1]/div/p[8]")))
+                                    buy_tax = float(
+                                        buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
+                                    sell_tax = float(
+                                        sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
+                                except selenium.common.exceptions.TimeoutException:
+                                    buy_tax, sell_tax = 0, 0
+                                    na_true = True
 
-                                    buy_tax = tax.text.split('%', 1)[0]
-                                    sell_tax = tax.text.split('%', 1)[1]
+                                if sell_tax >= self.maximum_sell_tax:
+                                    if self.database['Honeypot'][i] == 'N/A':
+                                        self.database['Honeypot'][i] = True
+                                        self.database['Excluded'][i] = True
+                                        print(Fore.RED + f'{ca_name} just became a honeypot!')
+                                        if current_contract not in self.exclude_list:
+                                            self.exclude_list.append(current_contract)
+                                else:
+                                    if self.database['Honeypot'][i] is True and self.database['Honeypot'][i] == 'N/A':
+                                        print(Fore.GREEN + f'{ca_name} just lost its honeypot!')
+                                        self.database['Honeypot'][i] = False
+                                        self.database['Excluded'][i] = False
+                                        self.exclude_list.remove(current_contract)
 
-                                    buy_tax = float(buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
-                                    sell_tax = float(sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
+                                if na_true:
+                                    buy_tax, sell_tax = 'N/A', 'N/A'
 
                                 self.database['Buy Tax'][i] = buy_tax
                                 self.database['Sell Tax'][i] = sell_tax
-
-                                if sell_tax <= self.maximum_sell_tax or honeypot_ornot.text == 'Yup, honeypot. Run the fuck away.':
-                                    if self.database['Honeypot'][i] is True and self.database['Honeypot'][i] == 'N/A':
-                                        print(Fore.GREEN + f'CA {current_contract} just lost its honeypot!')
-                                        self.database['Honeypot'][i] = False
-                                        self.exclude_list.remove(current_contract)
-                                else:
-                                    if self.database['Honeypot'][i] is False:
-                                        self.database['Honeypot'][i] = True
-                                        print(Fore.RED + f'CA {ca_name} just became a honeypot!')
-                                        if current_contract not in self.exclude_list:
-                                            self.exclude_list.append(current_contract)
 
                             except selenium.common.exceptions.TimeoutException:
                                 self.database['Honeypot'][i] = 'N/A'
@@ -450,7 +469,10 @@ class SniperOMancer:
                 rugcheck_v = 999999999999999999999999999
             honeypot_v = str(self.database['Honeypot'][ca_index])
             if rugcheck_v < self.maximum_alerts and honeypot_v == 'False':
-                buy_tax = float(self.database['Buy Tax'][ca_index])
+                try:
+                    buy_tax = float(self.database['Buy Tax'][ca_index])
+                except ValueError:
+                    buy_tax = 0
 
                 self.fake_buy_database.loc[len(self.fake_buy_database.index)] = [ca_name, ca, entry_price, None]
                 self.fake_buy_current_list.append(ca_name)
@@ -472,7 +494,7 @@ class SniperOMancer:
         print("\n\n")
         cprint(figlet_format(f'Sniper-O-Mancer', font='cosmic', width=150, justify="left"),
                'yellow')
-        print(Fore.CYAN + '\n                                                       v0.0.5 Alpha')
+        print(Fore.CYAN + '\n                                                       v0.0.6 Alpha')
         print(Fore.YELLOW + "                                                     Coded by yosharu")
         print(
             Fore.RED + "                                    THIS SNIPER WAS MADE TO BE USED UNDER CLOSE SUPERVISION! \n                    ANYONE INVOLVED IN THE DEVELOPMENT OF SoM ARE NOT LIABLE FOR ANY LOSSES OCCURED UNDER USE!\n                                      BY USING THIS SNIPER, YOU AGREE TO THESE TERMS.")
