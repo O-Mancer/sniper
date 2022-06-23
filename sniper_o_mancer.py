@@ -92,6 +92,7 @@ class SniperOMancer:
         self.fake_buy_database = pd.DataFrame(columns=['Name', 'Contract', 'Entry', 'Current'])
         self.fake_buy_current_list = []
         self.exclude_list = []
+        self.reset_done = False
 
     def scrape_newest_ca(self):
         while True:
@@ -221,7 +222,7 @@ class SniperOMancer:
                         sell_tax = float(
                             sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
                     except (selenium.common.exceptions.TimeoutException, IndexError) as e:
-                        buy_tax, sell_tax = 'N/A', 'N/A'
+                        buy_tax, sell_tax = 0, 0
                         pass
 
                     print(honeypot_ornot.text)
@@ -304,41 +305,44 @@ class SniperOMancer:
                 if info == 'price':
                     while True:
                         for i in range(len(self.database['Contract'])):
-                            current_contract = self.database['Contract'][i]
-                            price_update_link = f'https://poocoin.app/tokens/{current_contract}'
-                            ca_name = self.database['Name'][i]
-                            if current_contract not in self.exclude_list:
-                                # Price
-                                try:
-                                    self.price_updater_driver.get(price_update_link)
-                                    ca_price = WebDriverWait(self.price_updater_driver, self.max_scraper_wait).until(
-                                        EC.visibility_of_element_located((
-                                            By.XPATH,
-                                            "/html/body/div[1]/div/div[1]/div[2]/div/div[2]/div[1]/div[1]/div/div[1]/div/span")))
-
+                            if self.reset_done is False:
+                                current_contract = self.database['Contract'][i]
+                                price_update_link = f'https://poocoin.app/tokens/{current_contract}'
+                                ca_name = self.database['Name'][i]
+                                if current_contract not in self.exclude_list:
+                                    # Price
                                     try:
-                                        ca_price = float(ca_price.text.replace('$', ''))
-                                    except ValueError:
-                                        print(Fore.YELLOW + f'{ca_name} has an unstable price, skipping price')
-                                        ca_price = 'N/A'
+                                        self.price_updater_driver.get(price_update_link)
+                                        ca_price = WebDriverWait(self.price_updater_driver, self.max_scraper_wait).until(
+                                            EC.visibility_of_element_located((
+                                                By.XPATH,
+                                                "/html/body/div[1]/div/div[1]/div[2]/div/div[2]/div[1]/div[1]/div/div[1]/div/span")))
 
-                                    if self.database['Price'][i] == 'N/A' and ca_price != 'N/A':
-                                        print(Fore.GREEN + f'Liquidity added to CA {ca_name}!')
-                                        fake_buy_token = True
-                                    else:
-                                        fake_buy_token = False
-                                    self.database['Price'][i] = ca_price
+                                        try:
+                                            ca_price = float(ca_price.text.replace('$', ''))
+                                        except ValueError:
+                                            print(Fore.YELLOW + f'{ca_name} has an unstable price, skipping price')
+                                            ca_price = 'N/A'
 
-                                    if fake_buy_token:
-                                        t5 = threading.Thread(target=self.tx_handler,
-                                                              args=(
-                                                                  self.database['Name'][i], current_contract, ca_price,
-                                                                  i,),
-                                                              daemon=True)
-                                        t5.start()
-                                except selenium.common.exceptions.TimeoutException:
-                                    self.database['Price'][i] = 'N/A'
-                                time.sleep(self.updater_sleep_time)
+                                        if self.database['Price'][i] == 'N/A' and ca_price != 'N/A':
+                                            print(Fore.GREEN + f'Liquidity added to CA {ca_name}!')
+                                            fake_buy_token = True
+                                        else:
+                                            fake_buy_token = False
+                                        self.database['Price'][i] = ca_price
+
+                                        if fake_buy_token:
+                                            t5 = threading.Thread(target=self.tx_handler,
+                                                                  args=(
+                                                                      self.database['Name'][i], current_contract, ca_price,
+                                                                      i,),
+                                                                  daemon=True)
+                                            t5.start()
+                                    except selenium.common.exceptions.TimeoutException:
+                                        self.database['Price'][i] = 'N/A'
+                                    time.sleep(self.updater_sleep_time)
+                            else:
+                                time.sleep(2)
 
                 elif info == 'honeypot':
                     while True:
@@ -394,8 +398,11 @@ class SniperOMancer:
                                         self.database['Excluded'][i] = False
                                         self.exclude_list.remove(current_contract)
 
-                                if na_true:
-                                    buy_tax, sell_tax = 'N/A', 'N/A'
+                                try:
+                                    if na_true:
+                                        buy_tax, sell_tax = 'N/A', 'N/A'
+                                except UnboundLocalError:
+                                    pass
 
                                 self.database['Buy Tax'][i] = buy_tax
                                 self.database['Sell Tax'][i] = sell_tax
@@ -519,7 +526,10 @@ class SniperOMancer:
                         f'\n{Fore.CYAN}---------------------------------------------------------------------------------------------------------------------------------------------------------\n{Fore.YELLOW}Overview:\nBalance: {Fore.WHITE}{self.fake_balance} BNB\n\n{Fore.YELLOW}Database:{Fore.WHITE}\n{self.database}\n\n{Fore.YELLOW}Currently fake holding:\n{Fore.WHITE}{self.fake_buy_current_list}\n\n{Fore.YELLOW}System:{Fore.WHITE}\nUptime: {n_uptime}\n{Fore.CYAN}---------------------------------------------------------------------------------------------------------------------------------------------------------\n')
                     if len(self.database.index) >= self.maximum_database_index:
                         print(Fore.RED + f'Index above {self.maximum_database_index}, purging tokens not held...')
+                        self.reset_done = True
                         self.database = self.database[self.database['Name'].isin(self.fake_buy_current_list)]
+                        time.sleep(5)
+                        self.reset_done = False
                         print(Fore.RED + 'Done')
                     time.sleep(self.overview_sleep_time)
                 else:
