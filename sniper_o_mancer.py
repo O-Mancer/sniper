@@ -220,7 +220,7 @@ class SniperOMancer:
                             buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
                         sell_tax = float(
                             sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
-                    except selenium.common.exceptions.TimeoutException or IndexError:
+                    except (selenium.common.exceptions.TimeoutException, IndexError) as e:
                         buy_tax, sell_tax = 'N/A', 'N/A'
                         pass
 
@@ -524,7 +524,7 @@ class SniperOMancer:
                     time.sleep(self.overview_sleep_time)
                 else:
                     time.sleep(2)
-        except KeyboardInterrupt or Exception:
+        except (KeyboardInterrupt, Exception) as e:
             print(Fore.RED + '\nGoodbye.')
 
             # Simply .quit() didn't work on my system, so here i'm manually killing the Chrome windows with PIDs and task kill
