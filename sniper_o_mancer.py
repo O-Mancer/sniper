@@ -686,7 +686,8 @@ class SniperOMancer:
                     if len(self.database.index) >= self.maximum_database_index:
                         print(Fore.RED + f'Index above {self.maximum_database_index}, purging tokens not held...')
                         self.reset_done = True
-                        self.database = self.database[self.database['Name'].isin(self.fake_buy_current_list)]
+                        self.database = self.database[self.database['Xs'].notna()]
+                        self.database = self.database[self.database['Finished'] == False]
                         time.sleep(5)
                         self.reset_done = False
                         print(Fore.RED + 'Done')
