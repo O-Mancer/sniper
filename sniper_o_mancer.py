@@ -43,6 +43,8 @@ class SniperOMancer:
         self.overview_sleep_time = 60
         self.maximum_alerts = 5
         self.maximum_database_index = 5
+
+        self.maximum_buy_tax = 12
         self.maximum_sell_tax = 12
         self.minimum_market_cap = 250
 
@@ -323,6 +325,7 @@ class SniperOMancer:
                         latest_ca_rugdoc = 'Clean'
                     else:
                         latest_ca_rugdoc = 'Dirty'
+                        self.exclude_list.append(latest_ca)
 
                     if latest_ca in self.exclude_list:
                         excluded = True
@@ -613,7 +616,7 @@ class SniperOMancer:
             buy_tax = self.database['Buy Tax'][ca_index]
             sell_tax = self.database['Sell Tax'][ca_index]
             ca_x = self.database['Xs'][ca_index]
-            if rugcheck_v <= self.maximum_alerts and honeypot_v == 'False' and buy_tax != 'N/A' and sell_tax != 'N/A' and rugdoc_v == 'Clean' and mcap_v >= self.minimum_market_cap and ca_x == None:
+            if buy_tax <= self.maximum_buy_tax and sell_tax <= self.maximum_sell_tax and rugcheck_v <= self.maximum_alerts and honeypot_v == 'False' and buy_tax != 'N/A' and sell_tax != 'N/A' and rugdoc_v == 'Clean' and mcap_v >= self.minimum_market_cap and ca_x == None:
                 try:
                     buy_tax = float(self.database['Buy Tax'][ca_index])
                 except ValueError:
