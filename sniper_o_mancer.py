@@ -613,8 +613,11 @@ class SniperOMancer:
                 mcap_v = -1
             rugdoc_v = self.database['RugDoc'][ca_index]
             ownership_v = self.database['Ownership Renounced'][ca_index]
-            buy_tax = self.database['Buy Tax'][ca_index]
-            sell_tax = self.database['Sell Tax'][ca_index]
+            try:
+                buy_tax = self.database['Buy Tax'][ca_index]
+                sell_tax = self.database['Sell Tax'][ca_index]
+            except TypeError:
+                buy_tax, sell_tax = 999999999999999999999999999, 99999999999999999999999999999999
             ca_x = self.database['Xs'][ca_index]
             if buy_tax <= self.maximum_buy_tax and sell_tax <= self.maximum_sell_tax and rugcheck_v <= self.maximum_alerts and honeypot_v == 'False' and buy_tax != 'N/A' and sell_tax != 'N/A' and rugdoc_v == 'Clean' and mcap_v >= self.minimum_market_cap and ca_x == None:
                 try:
@@ -650,9 +653,12 @@ class SniperOMancer:
             elif rugdoc_v == 'Dirty':
                 if verbose:
                     print(Fore.RED + f'\n{ca_name} was dirty and was not bought!!')
+            elif buy_tax >= self.maximum_buy_tax and sell_tax >= self.maximum_sell_tax:
+                if verbose:
+                    print(Fore.RED + f'\n{ca_name} had too high tax/tax not found and was not bought!!')
             else:
                 if verbose:
-                    print(Fore.CYAN + '\nNot enough info to decide to buy token')
+                    print(Fore.RED + '\nNot enough info to decide to buy token.')
 
     def run(self):
         print("\n\n")
