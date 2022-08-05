@@ -32,7 +32,7 @@ def percentage(percent, whole):
 
 class SniperOMancer:
     def __init__(self):
-        self.version = 'v0.0.9.1 Alpha'
+        self.version = 'v0.0.9.2 Alpha'
 
         # SETTINGS
         self.wallet_address = ''
@@ -643,6 +643,14 @@ class SniperOMancer:
                         break
                     else:
                         time.sleep(self.fake_mode_sleep)
+                elif self.database['Finished'][fake_ca_database_index] == True:
+                    token_x = float(self.database['Xs'][fake_ca_database_index])
+                    profit = self.fake_buy*token_x
+                    if profit > self.fake_buy:
+                        self.write(Fore.GREEN + f'{ca_name} sold at a {token_x}x profit because of inactivity!')
+                    elif profit < self.fake_buy:
+                        self.write(Fore.RED + f'{ca_name} sold at a {token_x}x loss because of inactivity!')
+                    break
                 else:
                     self.write(Fore.RED + f'Money in {ca_name} lost!')
                     break
