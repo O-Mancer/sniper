@@ -57,8 +57,8 @@ class SniperOMancer:
         self.transaction_fee = 0.00088025
 
         self.telegram_enabled = False
-        self.telegram_bot_key = '5092660499:AAHpG8G-7AUA0UOXA7DBBKE_oZ0hVKG3PUM'
-        self.telegram_bot_chat_id = '-1001754045283'
+        self.telegram_bot_key = ''
+        self.telegram_bot_chat_id = ''
 
         # INIT
         pd.set_option("display.precision", 16)
