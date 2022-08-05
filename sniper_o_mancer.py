@@ -57,8 +57,8 @@ class SniperOMancer:
         self.transaction_fee = 0.00088025
 
         self.telegram_enabled = False
-        self.telegram_bot_key = ''
-        self.telegram_bot_chat_id = ''
+        self.telegram_bot_key = '5092660499:AAHpG8G-7AUA0UOXA7DBBKE_oZ0hVKG3PUM'
+        self.telegram_bot_chat_id = '-1001754045283'
 
         # INIT
         pd.set_option("display.precision", 16)
@@ -321,7 +321,14 @@ class SniperOMancer:
                         # RugDoc
                         rugdoc_link = f'{self.rugdoc_url}{latest_ca}&chain=bsc'
                         rugdoc_status = requests.post(rugdoc_link).json()
-                        rugdoc_status = rugdoc_status['status']
+                        try:
+                            rugdoc_status = rugdoc_status['status']
+                        except KeyError:
+                            try:
+                                rugdoc_status = requests.post(rugdoc_link).json()
+                                rugdoc_status = rugdoc_status['status']
+                            except KeyError:
+                                rugdoc_status = 'N/A'
                         if rugdoc_status == 'OK':
                             latest_ca_rugdoc = 'Clean'
                         else:
