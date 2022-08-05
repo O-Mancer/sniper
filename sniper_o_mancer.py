@@ -42,7 +42,7 @@ class SniperOMancer:
         self.updater_sleep_time = 5
         self.overview_sleep_time = 60
         self.maximum_alerts = 5
-        self.maximum_database_index = 5
+        self.maximum_database_index = 3
 
         self.maximum_buy_tax = 12
         self.maximum_sell_tax = 12
@@ -350,7 +350,8 @@ class SniperOMancer:
 
                         if fake_buy_token:
                             t6 = threading.Thread(target=self.tx_handler,
-                                                  args=(latest_ca_name, latest_ca, latest_ca_price, None, True,), daemon=True)
+                                                  args=(latest_ca_name, latest_ca, latest_ca_price, None, True,),
+                                                  daemon=True)
                             t6.start()
 
                         self.inoperation = False
@@ -362,120 +363,113 @@ class SniperOMancer:
             if len(self.database.index) > 0:
                 if info == 'price':
                     while True:
-                        for i in range(len(self.database['Contract'])):
-                            if self.reset_done:
-                                break
-                            else:
-                                current_contract = self.database['Contract'][i]
-                                price_update_link = f'https://poocoin.app/tokens/{current_contract}'
-                                ca_name = self.database['Name'][i]
-                                if current_contract not in self.exclude_list and self.database['Finished'][i] == False:
-                                    # Price and mcap
-                                    try:
-                                        self.price_updater_driver.get(price_update_link)
-                                        ca_price = WebDriverWait(self.price_updater_driver,
-                                                                 self.max_scraper_wait).until(
-                                            EC.visibility_of_element_located((
-                                                By.XPATH,
-                                                "/html/body/div[1]/div/div[1]/div[2]/div/div[2]/div[1]/div[1]/div/div[1]/div/span")))
-
+                        try:
+                            for i in range(len(self.database['Contract'])):
+                                if self.reset_done:
+                                    break
+                                else:
+                                    current_contract = self.database['Contract'][i]
+                                    price_update_link = f'https://poocoin.app/tokens/{current_contract}'
+                                    ca_name = self.database['Name'][i]
+                                    if current_contract not in self.exclude_list and self.database['Finished'][
+                                        i] == False:
+                                        # Price and mcap
                                         try:
-                                            ca_price = float(ca_price.text.replace('$', ''))
-                                        except ValueError:
-                                            ca_price = 'N/A'
+                                            self.price_updater_driver.get(price_update_link)
+                                            ca_price = WebDriverWait(self.price_updater_driver,
+                                                                     self.max_scraper_wait).until(
+                                                EC.visibility_of_element_located((
+                                                    By.XPATH,
+                                                    "/html/body/div[1]/div/div[1]/div[2]/div/div[2]/div[1]/div[1]/div/div[1]/div/span")))
 
-                                        ca_mcap = WebDriverWait(self.price_updater_driver,
-                                                                self.max_scraper_wait).until(
-                                            EC.visibility_of_element_located((By.XPATH,
-                                                                              "/html/body/div[1]/div/div[1]/div[2]/div/div[1]/div[2]/span[2]")))
-                                        try:
-                                            ca_mcap = float(ca_mcap.text.replace('$', '').replace(',', ''))
-                                        except ValueError:
-                                            ca_mcap = 'N/A'
+                                            try:
+                                                ca_price = float(ca_price.text.replace('$', ''))
+                                            except ValueError:
+                                                ca_price = 'N/A'
 
-                                        if self.database['Price'][i] == 'N/A' and ca_price != 'N/A':
-                                            print(Fore.GREEN + f'Liquidity added to CA {ca_name}!')
-                                            fake_buy_token = True
-                                        else:
-                                            fake_buy_token = False
+                                            ca_mcap = WebDriverWait(self.price_updater_driver,
+                                                                    self.max_scraper_wait).until(
+                                                EC.visibility_of_element_located((By.XPATH,
+                                                                                  "/html/body/div[1]/div/div[1]/div[2]/div/div[1]/div[2]/span[2]")))
+                                            try:
+                                                ca_mcap = float(ca_mcap.text.replace('$', '').replace(',', ''))
+                                            except ValueError:
+                                                ca_mcap = 'N/A'
 
-                                        if ca_mcap != 'N/A' and ca_mcap > 9999999:
-                                            ca_mcap = 'N/A'
-                                            fake_buy_token = False
+                                            if self.database['Price'][i] == 'N/A' and ca_price != 'N/A':
+                                                print(Fore.GREEN + f'Liquidity added to CA {ca_name}!')
+                                                fake_buy_token = True
+                                            else:
+                                                fake_buy_token = False
 
-                                        self.database['Price'][i] = ca_price
-                                        self.database['Market Cap'][i] = ca_mcap
+                                            if ca_mcap != 'N/A' and ca_mcap > 9999999:
+                                                ca_mcap = 'N/A'
+                                                fake_buy_token = False
 
-                                        if fake_buy_token:
-                                            t5 = threading.Thread(target=self.tx_handler,
-                                                                  args=(
-                                                                      ca_name, current_contract,
-                                                                      ca_price,
-                                                                      i, False,),
-                                                                  daemon=True)
-                                            t5.start()
-                                    except selenium.common.exceptions.TimeoutException:
-                                        self.database['Price'][i] = 'N/A'
-                                        self.database['Market Cap'][i] = 'N/A'
-                                    time.sleep(self.updater_sleep_time)
+                                            self.database['Price'][i] = ca_price
+                                            self.database['Market Cap'][i] = ca_mcap
+
+                                            if fake_buy_token:
+                                                t5 = threading.Thread(target=self.tx_handler,
+                                                                      args=(
+                                                                          ca_name, current_contract,
+                                                                          ca_price,
+                                                                          i, False,),
+                                                                      daemon=True)
+                                                t5.start()
+                                        except selenium.common.exceptions.TimeoutException:
+                                            self.database['Price'][i] = 'N/A'
+                                            self.database['Market Cap'][i] = 'N/A'
+                                        time.sleep(self.updater_sleep_time)
+                        except KeyError:
+                            time.sleep(self.updater_sleep_time)
 
                 elif info == 'honeypot':
                     while True:
-                        for i in range(len(self.database['Contract'])):
-                            current_contract = self.database['Contract'][i]
-                            ca_name = self.database['Name'][i]
-                            # Honeypot and tax
-                            if self.database['Finished'][i] == False:
-                                try:
-                                    honeypot_url_ca = f'{self.honeypot_url}{current_contract}'
-                                    self.honeypot_updater_driver.get(honeypot_url_ca)
-
-                                    honeypot_ornot = WebDriverWait(self.honeypot_updater_driver,
-                                                                   self.max_scraper_wait).until(
-                                        EC.visibility_of_element_located((By.XPATH,
-                                                                          "/html/body/div[2]/div[1]/div/div")))
-
-                                    if honeypot_ornot.text == 'Yup, honeypot. Run the fuck away.' and \
-                                            self.database['Honeypot.is'][i] == 'N/A':
-                                        self.database['Honeypot.is'][i] = True
-                                        self.database['Excluded'][i] = True
-                                        print(Fore.RED + f'{ca_name} just became a honeypot!')
-                                        if current_contract not in self.exclude_list:
-                                            self.exclude_list.append(current_contract)
-                                        fake_buy_token = False
-                                    elif honeypot_ornot.text == 'Does not seem like a honeypot.':
-                                        if self.database['Honeypot.is'][i] == True:
-                                            print(Fore.GREEN + f'{ca_name} just lost its honeypot!')
-                                        if current_contract in self.exclude_list:
-                                            self.exclude_list.remove(current_contract)
-                                        self.database['Honeypot.is'][i] = False
-                                        self.database['Excluded'][i] = False
-                                        if self.database['Price'][i] != 'N/A':
-                                            fake_buy_token = True
-                                        else:
-                                            fake_buy_token = False
-
-                                except selenium.common.exceptions.TimeoutException:
-                                    self.database['Honeypot.is'][i] = 'N/A'
-
-                                try:
+                        try:
+                            for i in range(len(self.database['Contract'])):
+                                current_contract = self.database['Contract'][i]
+                                ca_name = self.database['Name'][i]
+                                # Honeypot and tax
+                                if self.database['Finished'][i] == False:
                                     try:
-                                        tax = WebDriverWait(self.honeypot_updater_driver, self.max_scraper_wait).until(
+                                        honeypot_url_ca = f'{self.honeypot_url}{current_contract}'
+                                        self.honeypot_updater_driver.get(honeypot_url_ca)
+
+                                        honeypot_ornot = WebDriverWait(self.honeypot_updater_driver,
+                                                                       self.max_scraper_wait).until(
                                             EC.visibility_of_element_located((By.XPATH,
-                                                                              "/html/body/div[2]/div[1]/div/p[6]")))
-                                        buy_tax = tax.text.split('%', 1)[0]
-                                        sell_tax = tax.text.split('%', 1)[1]
+                                                                              "/html/body/div[2]/div[1]/div/div")))
 
-                                        buy_tax = float(
-                                            buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
-                                        sell_tax = float(
-                                            sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
-                                    except (IndexError, selenium.common.exceptions.TimeoutException):
+                                        if honeypot_ornot.text == 'Yup, honeypot. Run the fuck away.' and \
+                                                self.database['Honeypot.is'][i] == 'N/A':
+                                            self.database['Honeypot.is'][i] = True
+                                            self.database['Excluded'][i] = True
+                                            print(Fore.RED + f'{ca_name} just became a honeypot!')
+                                            if current_contract not in self.exclude_list:
+                                                self.exclude_list.append(current_contract)
+                                            fake_buy_token = False
+                                        elif honeypot_ornot.text == 'Does not seem like a honeypot.':
+                                            if self.database['Honeypot.is'][i] == True:
+                                                print(Fore.GREEN + f'{ca_name} just lost its honeypot!')
+                                            if current_contract in self.exclude_list:
+                                                self.exclude_list.remove(current_contract)
+                                            self.database['Honeypot.is'][i] = False
+                                            self.database['Excluded'][i] = False
+                                            if self.database['Price'][i] != 'N/A':
+                                                fake_buy_token = True
+                                            else:
+                                                fake_buy_token = False
+
+                                    except selenium.common.exceptions.TimeoutException:
+                                        self.database['Honeypot.is'][i] = 'N/A'
+
+                                    try:
                                         try:
-                                            tax = WebDriverWait(self.honeypot_updater_driver, self.max_scraper_wait).until(
+                                            tax = WebDriverWait(self.honeypot_updater_driver,
+                                                                self.max_scraper_wait).until(
                                                 EC.visibility_of_element_located((By.XPATH,
-                                                                                  "/html/body/div[2]/div[1]/div/p[5]")))
-
+                                                                                  "/html/body/div[2]/div[1]/div/p[6]")))
                                             buy_tax = tax.text.split('%', 1)[0]
                                             sell_tax = tax.text.split('%', 1)[1]
 
@@ -484,54 +478,75 @@ class SniperOMancer:
                                             sell_tax = float(
                                                 sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
                                         except (IndexError, selenium.common.exceptions.TimeoutException):
-                                            tax = WebDriverWait(self.honeypot_updater_driver, self.max_scraper_wait).until(
-                                                EC.visibility_of_element_located((By.XPATH,
-                                                                                  "/html/body/div[2]/div[1]/div/p[9]")))
+                                            try:
+                                                tax = WebDriverWait(self.honeypot_updater_driver,
+                                                                    self.max_scraper_wait).until(
+                                                    EC.visibility_of_element_located((By.XPATH,
+                                                                                      "/html/body/div[2]/div[1]/div/p[5]")))
 
-                                            buy_tax = tax.text.split('%', 1)[0]
-                                            sell_tax = tax.text.split('%', 1)[1]
+                                                buy_tax = tax.text.split('%', 1)[0]
+                                                sell_tax = tax.text.split('%', 1)[1]
 
-                                            buy_tax = float(
-                                                buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
-                                            sell_tax = float(
-                                                sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
+                                                buy_tax = float(
+                                                    buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
+                                                sell_tax = float(
+                                                    sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n',
+                                                                                                                ''))
+                                            except (IndexError, selenium.common.exceptions.TimeoutException):
+                                                tax = WebDriverWait(self.honeypot_updater_driver,
+                                                                    self.max_scraper_wait).until(
+                                                    EC.visibility_of_element_located((By.XPATH,
+                                                                                      "/html/body/div[2]/div[1]/div/p[9]")))
 
-                                    if self.database['Buy Tax'][i] == 'N/A' and self.database['Sell Tax'][i] == 'N/A' and buy_tax != 'N/A' and sell_tax != 'N/A':
-                                        fake_buy_token = True
+                                                buy_tax = tax.text.split('%', 1)[0]
+                                                sell_tax = tax.text.split('%', 1)[1]
 
-                                    if self.database['Buy Tax'][i] != 'N/A' and self.database['Sell Tax'][i] != 'N/A':
-                                        if self.database['Buy Tax'][i] != buy_tax:
-                                            old_buy_tax = self.database['Buy Tax'][i]
-                                            print(
-                                                Fore.RED + f'{ca_name} just changed their buy tax! Old tax: {old_buy_tax} | New tax: {buy_tax}')
-                                        elif self.database['Sell Tax'][i] != sell_tax:
-                                            old_sell_tax = self.database['Sell Tax'][i]
-                                            print(
-                                                Fore.RED + f'{ca_name} just changed their sell tax! Old tax: {old_sell_tax} | New tax: {sell_tax}')
-                                        elif self.database['Buy Tax'][i] != buy_tax and self.database['Sell Tax'][
-                                            i] != sell_tax:
-                                            old_buy_tax = self.database['Buy Tax'][i]
-                                            old_sell_tax = self.database['Sell Tax'][i]
-                                            print(
-                                                Fore.RED + f'{ca_name} just changed their taxes! Old tax: {old_buy_tax} / {old_sell_tax} | New tax: {buy_tax} / {sell_tax}')
+                                                buy_tax = float(
+                                                    buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
+                                                sell_tax = float(
+                                                    sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n',
+                                                                                                                ''))
 
-                                    self.database['Buy Tax'][i] = buy_tax
-                                    self.database['Sell Tax'][i] = sell_tax
+                                        if self.database['Buy Tax'][i] == 'N/A' and self.database['Sell Tax'][
+                                            i] == 'N/A' and buy_tax != 'N/A' and sell_tax != 'N/A':
+                                            fake_buy_token = True
 
-                                    if fake_buy_token:
-                                        t5 = threading.Thread(target=self.tx_handler,
-                                                              args=(
-                                                                  ca_name, current_contract,
-                                                                  self.database['Price'][i],
-                                                                  i, False,),
-                                                              daemon=True)
-                                        t5.start()
+                                        if self.database['Buy Tax'][i] != 'N/A' and self.database['Sell Tax'][
+                                            i] != 'N/A':
+                                            if self.database['Buy Tax'][i] != buy_tax:
+                                                old_buy_tax = self.database['Buy Tax'][i]
+                                                print(
+                                                    Fore.RED + f'{ca_name} just changed their buy tax! Old tax: {old_buy_tax} | New tax: {buy_tax}')
+                                            elif self.database['Sell Tax'][i] != sell_tax:
+                                                old_sell_tax = self.database['Sell Tax'][i]
+                                                print(
+                                                    Fore.RED + f'{ca_name} just changed their sell tax! Old tax: {old_sell_tax} | New tax: {sell_tax}')
+                                            elif self.database['Buy Tax'][i] != buy_tax and self.database['Sell Tax'][
+                                                i] != sell_tax:
+                                                old_buy_tax = self.database['Buy Tax'][i]
+                                                old_sell_tax = self.database['Sell Tax'][i]
+                                                print(
+                                                    Fore.RED + f'{ca_name} just changed their taxes! Old tax: {old_buy_tax} / {old_sell_tax} | New tax: {buy_tax} / {sell_tax}')
 
-                                except selenium.common.exceptions.TimeoutException:
-                                    self.database['Buy Tax'][i] = 'N/A'
-                                    self.database['Sell Tax'][i] = 'N/A'
+                                        self.database['Buy Tax'][i] = buy_tax
+                                        self.database['Sell Tax'][i] = sell_tax
 
-                        time.sleep(self.updater_sleep_time)
+                                        if fake_buy_token:
+                                            t5 = threading.Thread(target=self.tx_handler,
+                                                                  args=(
+                                                                      ca_name, current_contract,
+                                                                      self.database['Price'][i],
+                                                                      i, False,),
+                                                                  daemon=True)
+                                            t5.start()
+
+                                    except selenium.common.exceptions.TimeoutException:
+                                        self.database['Buy Tax'][i] = 'N/A'
+                                        self.database['Sell Tax'][i] = 'N/A'
+
+                            time.sleep(self.updater_sleep_time)
+                        except KeyError:
+                            time.sleep(self.updater_sleep_time)
             else:
                 time.sleep(10)
 
@@ -564,7 +579,8 @@ class SniperOMancer:
                     takeprofit = self.takeprofit_x + sell_tax_takeprofitx
                     stoploss = self.stoploss_x + sell_tax_stoplossx
 
-                    if current_bought_price > float(self.fake_buy_database['Entry'][fake_ca_fake_buy_index]) * takeprofit:
+                    if current_bought_price > float(
+                            self.fake_buy_database['Entry'][fake_ca_fake_buy_index]) * takeprofit:
                         fake_token_holding = False
                         profit_from_buy = self.fake_buy * self.takeprofit_x
                         profit_from_buy = profit_from_buy - percentage(sell_tax, profit_from_buy)
@@ -577,7 +593,8 @@ class SniperOMancer:
                             Fore.GREEN + f'{ca_name} fake sold at a {self.takeprofit_x}x profit! Balance: {self.fake_balance} BNB')
                         self.database['Finished'][fake_ca_database_index] = True
                         break
-                    elif current_bought_price < float(self.fake_buy_database['Entry'][fake_ca_fake_buy_index]) / stoploss:
+                    elif current_bought_price < float(
+                            self.fake_buy_database['Entry'][fake_ca_fake_buy_index]) / stoploss:
                         fake_token_holding = False
                         profit_from_buy = self.fake_buy / self.stoploss_x
                         self.fake_balance = self.fake_balance - (profit_from_buy + self.transaction_fee)
@@ -597,68 +614,73 @@ class SniperOMancer:
 
     def tx_handler(self, ca_name, ca, entry_price, index_n, verbose):
         if self.fake_mode:
-            if index_n is None:
-                ca_index = self.database.index[self.database['Contract'] == ca].tolist()[0]
-            else:
-                ca_index = index_n
             try:
-                rugcheck_v = int(self.database['Rugcheck Alerts'][ca_index])
-            except ValueError:
-                rugcheck_v = 999999999999999999999999999
-            honeypot_v = str(self.database['Honeypot.is'][ca_index])
-            price_v = str(self.database['Price'][ca_index])
-            try:
-                mcap_v = float(self.database['Market Cap'][ca_index])
-            except ValueError:
-                mcap_v = -1
-            rugdoc_v = self.database['RugDoc'][ca_index]
-            ownership_v = self.database['Ownership Renounced'][ca_index]
-            try:
-                buy_tax = float(self.database['Buy Tax'][ca_index])
-                sell_tax = float(self.database['Sell Tax'][ca_index])
-            except ValueError:
-                buy_tax, sell_tax = 999999999999999999999999999, 99999999999999999999999999999999
-            ca_x = self.database['Xs'][ca_index]
-            if buy_tax <= self.maximum_buy_tax and sell_tax <= self.maximum_sell_tax and rugcheck_v <= self.maximum_alerts and honeypot_v == 'False' and buy_tax != 'N/A' and sell_tax != 'N/A' and rugdoc_v == 'Clean' and mcap_v >= self.minimum_market_cap and ca_x == None:
+                if index_n is None:
+                    ca_index = self.database.index[self.database['Contract'] == ca].tolist()[0]
+                else:
+                    ca_index = index_n
+                ca_index_lost = False
+            except IndexError:
+                ca_index_lost = True
+            if not ca_index_lost:
+                try:
+                    rugcheck_v = int(self.database['Rugcheck Alerts'][ca_index])
+                except ValueError:
+                    rugcheck_v = 999999999999999999999999999
+                honeypot_v = str(self.database['Honeypot.is'][ca_index])
+                price_v = str(self.database['Price'][ca_index])
+                try:
+                    mcap_v = float(self.database['Market Cap'][ca_index])
+                except ValueError:
+                    mcap_v = -1
+                rugdoc_v = self.database['RugDoc'][ca_index]
+                ownership_v = self.database['Ownership Renounced'][ca_index]
                 try:
                     buy_tax = float(self.database['Buy Tax'][ca_index])
+                    sell_tax = float(self.database['Sell Tax'][ca_index])
                 except ValueError:
-                    buy_tax = 0
+                    buy_tax, sell_tax = 999999999999999999999999999, 99999999999999999999999999999999
+                ca_x = self.database['Xs'][ca_index]
+                if buy_tax <= self.maximum_buy_tax and sell_tax <= self.maximum_sell_tax and rugcheck_v <= self.maximum_alerts and honeypot_v == 'False' and buy_tax != 'N/A' and sell_tax != 'N/A' and rugdoc_v == 'Clean' and mcap_v >= self.minimum_market_cap and ca_x == None:
+                    try:
+                        buy_tax = float(self.database['Buy Tax'][ca_index])
+                    except ValueError:
+                        buy_tax = 0
 
-                self.fake_buy_database.loc[len(self.fake_buy_database.index)] = [ca_name, ca, entry_price, None]
-                self.fake_buy_current_list.append(ca_name)
-                self.fake_balance = self.fake_balance - (self.fake_buy + self.transaction_fee)
-                actual_fake_buy = self.fake_buy - percentage(buy_tax, self.fake_buy)
+                    self.fake_buy_database.loc[len(self.fake_buy_database.index)] = [ca_name, ca, entry_price, None]
+                    self.fake_buy_current_list.append(ca_name)
+                    self.fake_balance = self.fake_balance - (self.fake_buy + self.transaction_fee)
+                    actual_fake_buy = self.fake_buy - percentage(buy_tax, self.fake_buy)
 
-                print(
-                    Fore.BLUE + f'\nFake bought {ca_name} for {self.fake_buy} BNB (with tax: {actual_fake_buy} BNB), watching token for sell point...')
-                t4 = threading.Thread(target=self.token_watcher, args=(ca, ca_name,), daemon=True)
-                t4.start()
+                    print(
+                        Fore.BLUE + f'\nFake bought {ca_name} for {self.fake_buy} BNB (with tax: {actual_fake_buy} BNB), watching token for sell point...')
+                    t4 = threading.Thread(target=self.token_watcher, args=(ca, ca_name,), daemon=True)
+                    t4.start()
 
-                if self.telegram_enabled:
-                    lp_lock = self.database['LP Lock'][ca_index]
-                    poocoin_link = f'[💩](https://poocoin.app/tokens/{ca})'
-                    dexscreener_link = f'[🤖](https://dexscreener.com/bsc/{ca})'
-                    moonarch_link = f'[🌙](https://moonarch.app/token/{ca})'
-                    tgmessage = f'*NEWLY LAUNCHED SHITCOIN DETECTED:* %0A *Name*: {ca_name} %0A *CA*: {ca} %0A *Price*: {price_v} %0A *Market Cap*: {mcap_v} %0A *Buy Tax*: {buy_tax} %0A *Sell Tax*: {sell_tax} %0A *Honeypot.is*: {honeypot_v} %0A *RugDoc*: {rugdoc_v} %0A *LP Lock*: {lp_lock} %0A *Ownership renounced*: {ownership_v} %0A {poocoin_link} %0A {dexscreener_link} %0A {moonarch_link} %0A%0A _If i posted the CA, this means it passed Honeypot.is, Rugcheck and RugDoc. It does NOT guarantee future results._ %0A_Not financial advice, DYOR!_'
-                    requests.post(
-                        f'https://api.telegram.org/bot{self.telegram_bot_key}/sendMessage?chat_id={self.telegram_bot_chat_id}&text={tgmessage}&parse_mode=Markdown')
-                    print(Fore.CYAN + 'Telegram message sent')
-            elif rugcheck_v > self.maximum_alerts and rugcheck_v != 999999999999999999999999999:
-                if verbose:
-                    print(Fore.RED + f'\n{ca_name} has too many rugcheck alerts and was not bought!')
-            elif honeypot_v == 'True':
-                if verbose:
-                    print(Fore.RED + f'\n{ca_name} is a honeypot and was not bought!')
-            elif rugdoc_v == 'Dirty':
-                if verbose:
-                    print(Fore.RED + f'\n{ca_name} was dirty and was not bought!!')
-            elif buy_tax >= self.maximum_buy_tax and sell_tax >= self.maximum_sell_tax:
-                if verbose:
-                    print(Fore.RED + f'\n{ca_name} had too high tax/tax not found and was not bought!!')
-            else:
-                if verbose:
-                    print(Fore.RED + '\nNot enough info to decide to buy token.')
+                    if self.telegram_enabled:
+                        lp_lock = self.database['LP Lock'][ca_index]
+                        poocoin_link = f'[💩](https://poocoin.app/tokens/{ca})'
+                        dexscreener_link = f'[🤖](https://dexscreener.com/bsc/{ca})'
+                        moonarch_link = f'[🌙](https://moonarch.app/token/{ca})'
+                        tgmessage = f'*NEWLY LAUNCHED SHITCOIN DETECTED:* %0A *Name*: {ca_name} %0A *CA*: {ca} %0A *Price*: {price_v} %0A *Market Cap*: {mcap_v} %0A *Buy Tax*: {buy_tax} %0A *Sell Tax*: {sell_tax} %0A *Honeypot.is*: {honeypot_v} %0A *RugDoc*: {rugdoc_v} %0A *LP Lock*: {lp_lock} %0A *Ownership renounced*: {ownership_v} %0A {poocoin_link} %0A {dexscreener_link} %0A {moonarch_link} %0A%0A _If i posted the CA, this means it passed Honeypot.is, Rugcheck and RugDoc. It does NOT guarantee future results._ %0A_Not financial advice, DYOR!_'
+                        requests.post(
+                            f'https://api.telegram.org/bot{self.telegram_bot_key}/sendMessage?chat_id={self.telegram_bot_chat_id}&text={tgmessage}&parse_mode=Markdown')
+                        print(Fore.CYAN + 'Telegram message sent')
+                elif rugcheck_v > self.maximum_alerts and rugcheck_v != 999999999999999999999999999:
+                    if verbose:
+                        print(Fore.RED + f'\n{ca_name} has too many rugcheck alerts and was not bought!')
+                elif honeypot_v == 'True':
+                    if verbose:
+                        print(Fore.RED + f'\n{ca_name} is a honeypot and was not bought!')
+                elif rugdoc_v == 'Dirty':
+                    if verbose:
+                        print(Fore.RED + f'\n{ca_name} was dirty and was not bought!!')
+                elif buy_tax >= self.maximum_buy_tax and sell_tax >= self.maximum_sell_tax:
+                    if verbose:
+                        print(Fore.RED + f'\n{ca_name} had too high tax/tax not found and was not bought!!')
+                else:
+                    if verbose:
+                        print(Fore.RED + '\nNot enough info to decide to buy token.')
 
     def run(self):
         print("\n\n")
