@@ -19,6 +19,8 @@ from selenium.webdriver.chrome.options import Options
 from contextlib import suppress
 import psutil
 from termcolor import cprint
+from time import gmtime
+from time import strftime
 
 init(autoreset=True, strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
 
@@ -32,7 +34,7 @@ def percentage(percent, whole):
 
 class SniperOMancer:
     def __init__(self):
-        self.version = 'v0.0.8 Alpha'
+        self.version = 'v0.0.9 Alpha'
 
         # SETTINGS
         self.wallet_address = ''
@@ -55,6 +57,7 @@ class SniperOMancer:
         self.takeprofit_x = 2
         self.stoploss_x = 2
         self.transaction_fee = 0.00088025
+        self.maximum_minutes_in_database = 60
 
         self.telegram_enabled = False
         self.telegram_bot_key = ''
@@ -84,7 +87,7 @@ class SniperOMancer:
         self.honeypot_url = 'https://honeypot.is/?address='
         self.rugdoc_url = 'https://honeypot.api.rugdoc.io/api/honeypotStatus.js?address='
         self.database = pd.DataFrame(
-            columns=['Name', 'Contract', 'Price', 'Market Cap', 'Buy Tax', 'Sell Tax', 'Honeypot.is', 'RugDoc',
+            columns=['Timestamp', 'Name', 'Contract', 'Price', 'Market Cap', 'Buy Tax', 'Sell Tax', 'Honeypot.is', 'RugDoc',
                      'Rugcheck Alerts', 'Scam',
                      'LP Lock',
                      'Ownership Renounced', 'Excluded', 'Xs', 'Finished'])
@@ -103,6 +106,10 @@ class SniperOMancer:
         n = int(time.time() - self.startTime)
         return str(datetime.timedelta(seconds=n))
 
+    def write(self, x):
+        ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        print("[{}] {}".format(str(ts), x))
+
     def scrape_newest_ca(self):
         while True:
             try:
@@ -110,7 +117,8 @@ class SniperOMancer:
                     time.sleep(1)
                 else:
                     self.inoperation = True
-                    print(Fore.YELLOW + '\nScraping newest jewarch CA...')
+
+                    # print(Fore.YELLOW + '\nScraping newest jewarch CA...')
 
                     def get_latest_ca_func():
                         try:
@@ -126,14 +134,15 @@ class SniperOMancer:
                     try:
                         latest_ca = get_latest_ca_func()
                     except selenium.common.exceptions.TimeoutException:
-                        print(Fore.RED + 'Jewarch is down, waiting 60s to retry.')
+                        self.write(Fore.RED + 'Jewarch is down, waiting 60s to retry.')
                         latest_ca = get_latest_ca_func()
 
                     try:
                         latest_ca_link = latest_ca.get_attribute('href')
                         latest_ca = latest_ca.get_attribute('href').replace('https://poocoin.app/tokens/', '')
                     except AttributeError:
-                        print(Fore.RED + 'JewArch grabbing failed after 3 attempts, exiting...')
+                        latest_ca_link = None
+                        self.write(Fore.RED + 'JewArch grabbing failed after 3 attempts, exiting...')
                         # Simply .quit() didn't work on my system, so here i'm manually killing the Chrome windows with PIDs and task kill
                         for process in psutil.process_iter():
                             if process.name() == 'chrome.exe' and '--test-type=webdriver' in process.cmdline():
@@ -144,11 +153,11 @@ class SniperOMancer:
                         quit()
 
                     if len(self.database['Contract']) > 0 and latest_ca in self.database["Contract"].values:
-                        print(Fore.CYAN + 'Contract already in database, continuing...')
-                        print(Fore.YELLOW + f'\nSleeping for {self.scraper_sleep_time} seconds...')
+                        # print(Fore.CYAN + 'Contract already in database, continuing...')
+                        # print(Fore.YELLOW + f'\nSleeping for {self.scraper_sleep_time} seconds...')
                         time.sleep(self.scraper_sleep_time)
                     else:
-                        print(Fore.YELLOW + 'New CA detected, getting info...')
+                        # print(Fore.YELLOW + 'New CA detected, getting info...')
 
                         # Rugcheck
                         try:
@@ -200,7 +209,8 @@ class SniperOMancer:
 
                         # Ownership
                         try:
-                            ownership_renounce_check = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                            ownership_renounce_check = WebDriverWait(self.newest_ca_driver,
+                                                                     self.max_scraper_wait).until(
                                 EC.visibility_of_element_located((By.XPATH,
                                                                   "/html/body/div[2]/div[1]/div/div/div/div/div[3]/div[2]/ul/li[8]/span")))
                             if ownership_renounce_check.text == ' Renounced ':
@@ -287,10 +297,9 @@ class SniperOMancer:
                                                                   "/html/body/div[1]/div/div[1]/div[2]/div/div[2]/div[1]/div[1]/div/div[1]/div/span")))
                             try:
                                 latest_ca_price = float(latest_ca_price.text.replace('$', ''))
-                                latest_ca_price_forprint = f'{latest_ca_price:.20f}'
                                 fake_buy_token = True
                             except ValueError:
-                                print(Fore.YELLOW + f'{latest_ca_name} has an unstable price, skipping price')
+                                self.write(Fore.YELLOW + f'{latest_ca_name} has an unstable price, skipping price')
                                 latest_ca_price = 'N/A'
                                 fake_buy_token = False
 
@@ -303,10 +312,10 @@ class SniperOMancer:
                                 EC.visibility_of_element_located((By.XPATH,
                                                                   "/html/body/div[1]/div/div[1]/div[2]/div/div[1]/div[2]/span[2]")))
                             try:
-                                latest_ca_mcap = float(latest_ca_mcap.text.replace('$', '').replace(',', ''))
+                                latest_ca_mcap = int(latest_ca_mcap.text.replace('$', '').replace(',', ''))
                                 fake_buy_token = True
                             except ValueError:
-                                print(Fore.YELLOW + f'{latest_ca_name} has an unstable market cap, skipping...')
+                                self.write(Fore.YELLOW + f'{latest_ca_name} has an unstable market cap, skipping...')
                                 latest_ca_mcap = 'N/A'
                                 fake_buy_token = False
 
@@ -337,14 +346,22 @@ class SniperOMancer:
 
                         if latest_ca in self.exclude_list:
                             excluded = True
-                            print(Fore.RED + f'Added {latest_ca_name} to exclusion list.')
+                            self.write(Fore.RED + f'Added {latest_ca_name} to exclusion list.')
                         else:
                             excluded = False
 
+                        if latest_ca_price != 'N/A':
+                            latest_ca_price_forprint = f'latest_ca_price:.20f'
+                        else:
+                            latest_ca_price_forprint = 'N/A'
+
+                        timestamp = time.time()
+
                         if latest_ca_name != 'PooCoin BSC Charts':
-                            self.database.loc[len(self.database.index)] = [latest_ca_name, latest_ca, latest_ca_price,
+                            self.database.loc[len(self.database.index)] = [timestamp, latest_ca_name, latest_ca, latest_ca_price,
                                                                            latest_ca_mcap, buy_tax,
-                                                                           sell_tax, latest_ca_honeypot, latest_ca_rugdoc,
+                                                                           sell_tax, latest_ca_honeypot,
+                                                                           latest_ca_rugdoc,
                                                                            alert_number, is_scam, latest_ca_lplock,
                                                                            latest_ca_ownership,
                                                                            excluded, None, False]
@@ -354,7 +371,7 @@ class SniperOMancer:
                             print(
                                 Fore.GREEN + f'Name: {Fore.WHITE}{latest_ca_name} \n{Fore.GREEN}CA: {Fore.WHITE}{latest_ca} \n{Fore.GREEN}Price: {Fore.WHITE}{latest_ca_price_forprint} \n{Fore.GREEN}Market Cap: {Fore.WHITE}{latest_ca_mcap} \n{Fore.GREEN}Buy Tax: {Fore.WHITE}{buy_tax} \n{Fore.GREEN}Sell Tax: {Fore.WHITE}{sell_tax} \n{Fore.GREEN}Rugcheck Alerts: {Fore.WHITE}{alert_number} \n{Fore.GREEN}Honeypot.is: {Fore.WHITE}{latest_ca_honeypot} \n{Fore.GREEN}RugDoc: {Fore.WHITE}{latest_ca_rugdoc} \n{Fore.GREEN}LP Lock: {Fore.WHITE}{latest_ca_lplock} \n{Fore.GREEN}Ownership renounced: {Fore.WHITE}{latest_ca_ownership}')
                             print(Fore.CYAN + '----------------------------------------------')
-                            print(Fore.YELLOW + f'\nAdded {latest_ca_name} to database...')
+                            self.write(Fore.YELLOW + f'Added {latest_ca_name} to database...')
 
                             if fake_buy_token:
                                 t6 = threading.Thread(target=self.tx_handler,
@@ -363,9 +380,10 @@ class SniperOMancer:
                                 t6.start()
 
                             self.inoperation = False
-                            print(Fore.YELLOW + f'\nSleeping for {self.scraper_sleep_time} seconds...')
+                            # print(Fore.YELLOW + f'\nSleeping for {self.scraper_sleep_time} seconds...')
                             time.sleep(self.scraper_sleep_time)
-            except ValueError:
+            except ValueError as e:
+                print(e)
                 time.sleep(self.scraper_sleep_time)
 
     def updater(self, info):
@@ -381,6 +399,10 @@ class SniperOMancer:
                                     current_contract = self.database['Contract'][i]
                                     price_update_link = f'https://poocoin.app/tokens/{current_contract}'
                                     ca_name = self.database['Name'][i]
+                                    ca_timestamp = int(self.database['Timestamp'][i])
+                                    seconds = self.maximum_minutes_in_database*60
+                                    if time.time() - ca_timestamp >= seconds:
+                                        self.database['Finished'][i] = True
                                     if current_contract not in self.exclude_list and self.database['Finished'][
                                         i] == False:
                                         # Price and mcap
@@ -402,12 +424,12 @@ class SniperOMancer:
                                                 EC.visibility_of_element_located((By.XPATH,
                                                                                   "/html/body/div[1]/div/div[1]/div[2]/div/div[1]/div[2]/span[2]")))
                                             try:
-                                                ca_mcap = float(ca_mcap.text.replace('$', '').replace(',', ''))
+                                                ca_mcap = int(ca_mcap.text.replace('$', '').replace(',', ''))
                                             except ValueError:
                                                 ca_mcap = 'N/A'
 
                                             if self.database['Price'][i] == 'N/A' and ca_price != 'N/A':
-                                                print(Fore.GREEN + f'Liquidity added to CA {ca_name}!')
+                                                self.write(Fore.GREEN + f'Liquidity added to CA {ca_name}!')
                                                 fake_buy_token = True
                                             else:
                                                 fake_buy_token = False
@@ -440,6 +462,10 @@ class SniperOMancer:
                             for i in range(len(self.database['Contract'])):
                                 current_contract = self.database['Contract'][i]
                                 ca_name = self.database['Name'][i]
+                                ca_timestamp = int(self.database['Timestamp'][i])
+                                seconds = self.maximum_minutes_in_database * 60
+                                if time.time() - ca_timestamp >= seconds:
+                                    self.database['Finished'][i] = True
                                 # Honeypot and tax
                                 if self.database['Finished'][i] == False:
                                     try:
@@ -455,13 +481,13 @@ class SniperOMancer:
                                                 self.database['Honeypot.is'][i] == 'N/A':
                                             self.database['Honeypot.is'][i] = True
                                             self.database['Excluded'][i] = True
-                                            print(Fore.RED + f'{ca_name} just became a honeypot!')
+                                            self.write(Fore.RED + f'{ca_name} just became a honeypot!')
                                             if current_contract not in self.exclude_list:
                                                 self.exclude_list.append(current_contract)
                                             fake_buy_token = False
                                         elif honeypot_ornot.text == 'Does not seem like a honeypot.':
                                             if self.database['Honeypot.is'][i] == True:
-                                                print(Fore.GREEN + f'{ca_name} just lost its honeypot!')
+                                                self.write(Fore.GREEN + f'{ca_name} just lost its honeypot!')
                                             if current_contract in self.exclude_list:
                                                 self.exclude_list.remove(current_contract)
                                             self.database['Honeypot.is'][i] = False
@@ -525,17 +551,17 @@ class SniperOMancer:
                                             i] != 'N/A':
                                             if self.database['Buy Tax'][i] != buy_tax:
                                                 old_buy_tax = self.database['Buy Tax'][i]
-                                                print(
+                                                self.write(
                                                     Fore.RED + f'{ca_name} just changed their buy tax! Old tax: {old_buy_tax} | New tax: {buy_tax}')
                                             elif self.database['Sell Tax'][i] != sell_tax:
                                                 old_sell_tax = self.database['Sell Tax'][i]
-                                                print(
+                                                self.write(
                                                     Fore.RED + f'{ca_name} just changed their sell tax! Old tax: {old_sell_tax} | New tax: {sell_tax}')
                                             elif self.database['Buy Tax'][i] != buy_tax and self.database['Sell Tax'][
                                                 i] != sell_tax:
                                                 old_buy_tax = self.database['Buy Tax'][i]
                                                 old_sell_tax = self.database['Sell Tax'][i]
-                                                print(
+                                                self.write(
                                                     Fore.RED + f'{ca_name} just changed their taxes! Old tax: {old_buy_tax} / {old_sell_tax} | New tax: {buy_tax} / {sell_tax}')
 
                                         self.database['Buy Tax'][i] = buy_tax
@@ -568,7 +594,7 @@ class SniperOMancer:
             else:
                 fake_ca_database_index = self.database.index[self.database['Contract'] == ca].tolist()[0]
                 fake_ca_fake_buy_index = \
-                self.fake_buy_database.index[self.fake_buy_database['Contract'] == ca].tolist()[0]
+                    self.fake_buy_database.index[self.fake_buy_database['Contract'] == ca].tolist()[0]
                 if self.fake_buy_database['Contract'][fake_ca_fake_buy_index] not in self.exclude_list and \
                         self.database['Price'][fake_ca_database_index] != 'N/A':
                     fake_ca_database_index = self.database.index[self.database['Contract'] == ca].tolist()[0]
@@ -600,7 +626,7 @@ class SniperOMancer:
                             self.fake_buy_current_list.remove(remove_ca_name)
                         except ValueError:
                             pass
-                        print(
+                        self.write(
                             Fore.GREEN + f'{ca_name} fake sold at a {self.takeprofit_x}x profit! Balance: {self.fake_balance} BNB')
                         self.database['Finished'][fake_ca_database_index] = True
                         break
@@ -613,18 +639,18 @@ class SniperOMancer:
                             self.fake_buy_current_list.remove(remove_ca_name)
                         except ValueError:
                             pass
-                        print(
+                        self.write(
                             Fore.RED + f'{ca_name} fake sold at a -{self.stoploss_x}x loss! Balance: {self.fake_balance} BNB')
                         self.database['Finished'][fake_ca_database_index] = True
                         break
                     else:
                         time.sleep(self.fake_mode_sleep)
                 else:
-                    print(Fore.RED + f'Money in {ca_name} lost!')
+                    self.write(Fore.RED + f'Money in {ca_name} lost!')
                     break
 
     def tx_handler(self, ca_name, ca, entry_price, index_n, verbose):
-        if self.fake_mode:
+        if self.fake_mode and self.fake_balance >= self.fake_buy:
             try:
                 if index_n is None:
                     ca_index = self.database.index[self.database['Contract'] == ca].tolist()[0]
@@ -633,6 +659,7 @@ class SniperOMancer:
                 ca_index_lost = False
             except IndexError:
                 ca_index_lost = True
+                ca_index = None
             if not ca_index_lost:
                 try:
                     rugcheck_v = int(self.database['Rugcheck Alerts'][ca_index])
@@ -663,8 +690,8 @@ class SniperOMancer:
                     self.fake_balance = self.fake_balance - (self.fake_buy + self.transaction_fee)
                     actual_fake_buy = self.fake_buy - percentage(buy_tax, self.fake_buy)
 
-                    print(
-                        Fore.BLUE + f'\nFake bought {ca_name} for {self.fake_buy} BNB (with tax: {actual_fake_buy} BNB), watching token for sell point...')
+                    self.write(
+                        Fore.BLUE + f'Fake bought {ca_name} for {self.fake_buy} BNB (with tax: {actual_fake_buy} BNB), watching token for sell point...')
                     t4 = threading.Thread(target=self.token_watcher, args=(ca, ca_name,), daemon=True)
                     t4.start()
 
@@ -676,22 +703,22 @@ class SniperOMancer:
                         tgmessage = f'*NEWLY LAUNCHED SHITCOIN DETECTED:* %0A *Name*: {ca_name} %0A *CA*: {ca} %0A *Price*: {price_v} %0A *Market Cap*: {mcap_v} %0A *Buy Tax*: {buy_tax} %0A *Sell Tax*: {sell_tax} %0A *Honeypot.is*: {honeypot_v} %0A *RugDoc*: {rugdoc_v} %0A *LP Lock*: {lp_lock} %0A *Ownership renounced*: {ownership_v} %0A {poocoin_link} %0A {dexscreener_link} %0A {moonarch_link} %0A%0A _If i posted the CA, this means it passed Honeypot.is, Rugcheck and RugDoc. It does NOT guarantee future results._ %0A_Not financial advice, DYOR!_'
                         requests.post(
                             f'https://api.telegram.org/bot{self.telegram_bot_key}/sendMessage?chat_id={self.telegram_bot_chat_id}&text={tgmessage}&parse_mode=Markdown')
-                        print(Fore.CYAN + 'Telegram message sent')
+                        self.write(Fore.CYAN + 'Telegram message sent')
                 elif rugcheck_v > self.maximum_alerts and rugcheck_v != 999999999999999999999999999:
                     if verbose:
-                        print(Fore.RED + f'\n{ca_name} has too many rugcheck alerts and was not bought!')
+                        self.write(Fore.RED + f'{ca_name} has too many rugcheck alerts and was not bought!')
                 elif honeypot_v == 'True':
                     if verbose:
-                        print(Fore.RED + f'\n{ca_name} is a honeypot and was not bought!')
+                        self.write(Fore.RED + f'{ca_name} is a honeypot and was not bought!')
                 elif rugdoc_v == 'Dirty':
                     if verbose:
-                        print(Fore.RED + f'\n{ca_name} was dirty and was not bought!!')
+                        self.write(Fore.RED + f'{ca_name} was dirty and was not bought!!')
                 elif buy_tax >= self.maximum_buy_tax and sell_tax >= self.maximum_sell_tax:
                     if verbose:
-                        print(Fore.RED + f'\n{ca_name} had too high tax/tax not found and was not bought!!')
+                        self.write(Fore.RED + f'{ca_name} had too high tax/tax not found and was not bought!!')
                 else:
                     if verbose:
-                        print(Fore.RED + '\nNot enough info to decide to buy token.')
+                        self.write(Fore.RED + 'Not enough info to decide to buy token.')
 
     def run(self):
         print("\n\n")
@@ -700,16 +727,16 @@ class SniperOMancer:
         print(Fore.CYAN + f'\n                                                       {self.version}')
         print(Fore.YELLOW + "                                                     Coded by yosharu")
         print(
-            Fore.RED + "                                    THIS SNIPER WAS MADE TO BE USED UNDER CLOSE SUPERVISION! \n                    ANYONE INVOLVED IN THE DEVELOPMENT OF SoM ARE NOT LIABLE FOR ANY LOSSES OCCURED UNDER USE!\n                                      BY USING THIS SNIPER, YOU AGREE TO THESE TERMS.")
+            Fore.RED + "                                    THIS SNIPER WAS MADE TO BE USED UNDER CLOSE SUPERVISION! \n                    ANYONE INVOLVED IN THE DEVELOPMENT OF SoM ARE NOT LIABLE FOR ANY LOSSES OCCURED UNDER USE!\n                                      BY USING THIS SNIPER, YOU AGREE TO THESE TERMS.\n")
         try:
-            print(Fore.CYAN + '\nStarting threads...')
+            # print(Fore.CYAN + '\nStarting threads...')
             t1 = threading.Thread(target=self.scrape_newest_ca, daemon=True)
             t2 = threading.Thread(target=self.updater, args=('price',), daemon=True)
             t3 = threading.Thread(target=self.updater, args=('honeypot',), daemon=True)
             t1.start()
             t2.start()
             t3.start()
-            print(Fore.CYAN + '\nThreads started')
+            self.write(Fore.CYAN + 'Threads started')
             time.sleep(5)
             while True:
                 if self.inoperation is False:
@@ -717,19 +744,19 @@ class SniperOMancer:
                     print(
                         f'\n{Fore.CYAN}---------------------------------------------------------------------------------------------------------------------------------------------------------\n{Fore.YELLOW}Overview:\nBalance: {Fore.WHITE}{self.fake_balance} BNB\n\n{Fore.YELLOW}Database:{Fore.WHITE}\n{self.database}\n\n{Fore.YELLOW}Currently fake holding:\n{Fore.WHITE}{self.fake_buy_current_list}\n\n{Fore.YELLOW}System:{Fore.WHITE}\n{Fore.YELLOW}Uptime: {Fore.WHITE}{n_uptime}\n{Fore.YELLOW}Version: {Fore.WHITE}{self.version}\n{Fore.CYAN}---------------------------------------------------------------------------------------------------------------------------------------------------------\n')
                     if len(self.database.index) >= self.maximum_database_index:
-                        print(Fore.RED + f'Index above {self.maximum_database_index}, purging tokens not held...')
+                        self.write(Fore.RED + 'Purging inactive tokens...')
                         self.reset_done = True
                         self.database = self.database[self.database['Xs'].notna()]
                         self.database = self.database[self.database['Finished'] == False]
                         self.database = self.database.reset_index().drop(columns=['index'])
                         time.sleep(5)
                         self.reset_done = False
-                        print(Fore.RED + 'Done')
                     time.sleep(self.overview_sleep_time)
                 else:
                     time.sleep(2)
         except (KeyboardInterrupt, Exception) as e:
-            print(Fore.RED + '\nGoodbye.')
+            # self.write(f'{e}')
+            self.write(Fore.RED + 'Goodbye.')
 
             # Simply .quit() didn't work on my system, so here i'm manually killing the Chrome windows with PIDs and task kill
             for process in psutil.process_iter():
