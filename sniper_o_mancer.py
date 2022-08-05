@@ -32,7 +32,7 @@ def percentage(percent, whole):
 
 class SniperOMancer:
     def __init__(self):
-        self.version = 'v0.0.7 Alpha'
+        self.version = 'v0.0.8 Alpha'
 
         # SETTINGS
         self.wallet_address = ''
@@ -42,7 +42,7 @@ class SniperOMancer:
         self.updater_sleep_time = 5
         self.overview_sleep_time = 60
         self.maximum_alerts = 5
-        self.maximum_database_index = 3
+        self.maximum_database_index = 10
 
         self.maximum_buy_tax = 12
         self.maximum_sell_tax = 12
@@ -57,8 +57,8 @@ class SniperOMancer:
         self.transaction_fee = 0.00088025
 
         self.telegram_enabled = False
-        self.telegram_bot_key = '5092660499:AAHpG8G-7AUA0UOXA7DBBKE_oZ0hVKG3PUM'
-        self.telegram_bot_chat_id = '-1001754045283'
+        self.telegram_bot_key = ''
+        self.telegram_bot_chat_id = ''
 
         # INIT
         pd.set_option("display.precision", 16)
@@ -105,137 +105,124 @@ class SniperOMancer:
 
     def scrape_newest_ca(self):
         while True:
-            if self.reset_done:
-                time.sleep(1)
-            else:
-                self.inoperation = True
-                print(Fore.YELLOW + '\nScraping newest jewarch CA...')
-
-                def get_latest_ca_func():
-                    try:
-                        self.newest_ca_driver.get(self.jewarch_url)
-                        latest_ca = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
-                            EC.visibility_of_element_located((
-                                By.XPATH,
-                                "/html/body/div/div[2]/div/div[2]/div[1]/div[3]/div/div/div/table/tbody/tr[1]/td[4]/div/a[2]")))
-                        return latest_ca
-                    except selenium.common.exceptions.TimeoutException:
-                        get_latest_ca_func()
-
-                try:
-                    latest_ca = get_latest_ca_func()
-                except selenium.common.exceptions.TimeoutException:
-                    print(Fore.RED + 'Jewarch is down, waiting 60s to retry.')
-                    latest_ca = get_latest_ca_func()
-
-                try:
-                    latest_ca_link = latest_ca.get_attribute('href')
-                    latest_ca = latest_ca.get_attribute('href').replace('https://poocoin.app/tokens/', '')
-                except AttributeError:
-                    print(Fore.RED + 'JewArch grabbing failed after 3 attempts, exiting...')
-                    # Simply .quit() didn't work on my system, so here i'm manually killing the Chrome windows with PIDs and task kill
-                    for process in psutil.process_iter():
-                        if process.name() == 'chrome.exe' and '--test-type=webdriver' in process.cmdline():
-                            with suppress(psutil.NoSuchProcess):
-                                self.kill_list.append(process.pid)
-                    for proc_id in self.kill_list:
-                        os.kill(int(proc_id), signal.SIGTERM)
-                    quit()
-
-                if len(self.database['Contract']) > 0 and latest_ca in self.database["Contract"].values:
-                    print(Fore.CYAN + 'Contract already in database, continuing...')
-                    print(Fore.YELLOW + f'\nSleeping for {self.scraper_sleep_time} seconds...')
-                    time.sleep(self.scraper_sleep_time)
+            try:
+                if self.reset_done:
+                    time.sleep(1)
                 else:
-                    print(Fore.YELLOW + 'New CA detected, getting info...')
+                    self.inoperation = True
+                    print(Fore.YELLOW + '\nScraping newest jewarch CA...')
 
-                    # Rugcheck
-                    try:
-                        latest_ca_button = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
-                            EC.visibility_of_element_located((By.XPATH,
-                                                              "/html/body/div/div[2]/div/div[2]/div[1]/div[3]/div/div/div/table/tbody/tr[1]/td[3]/div/a")))
-                        latest_ca_button.click()
+                    def get_latest_ca_func():
                         try:
-                            rugcheck = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
-                                EC.visibility_of_element_located((By.XPATH,
-                                                                  "/html/body/div[2]/div[1]/div/div/div/div/div[2]/button[4]/div/div/span")))
-
-                            alert_number = int(rugcheck.text)
-                            if alert_number > self.maximum_alerts:
-                                self.exclude_list.append(latest_ca)
-                            is_scam = False
+                            self.newest_ca_driver.get(self.jewarch_url)
+                            latest_ca = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                                EC.visibility_of_element_located((
+                                    By.XPATH,
+                                    "/html/body/div/div[2]/div/div[2]/div[1]/div[3]/div/div/div/table/tbody/tr[1]/td[4]/div/a[2]")))
+                            return latest_ca
                         except selenium.common.exceptions.TimeoutException:
-                            rugcheck = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
-                                EC.visibility_of_element_located((By.XPATH,
-                                                                  "/html/body/div[2]/div[1]/div/div/div/div/div[2]/button[4]/div/span")))
-                            if rugcheck.get_attribute(
-                                    "title") == 'Moonarch rugcheck found suspicious code in the token contract':
-                                alert_number = 'N/A'
-                                is_scam = True
-                                if latest_ca not in self.exclude_list:
-                                    self.exclude_list.append(latest_ca)
-                            else:
-                                alert_number = 'N/A'
-                                is_scam = False
+                            get_latest_ca_func()
 
-                    except selenium.common.exceptions.TimeoutException:
-                        alert_number = 'N/A'
-                        is_scam = 'N/A'
-
-                    # LP Lock
                     try:
-                        lplock_or_not = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
-                            EC.visibility_of_element_located((By.XPATH,
-                                                              "/html/body/div[2]/div[1]/div/div/div/div/div[2]/button[3]/span")))
-                        if lplock_or_not.text == '0':
-                            latest_ca_lplock = False
-                        elif lplock_or_not.text == '?':
-                            latest_ca_lplock = 'N/A'
-                        else:
-                            latest_ca_lplock = True
-
+                        latest_ca = get_latest_ca_func()
                     except selenium.common.exceptions.TimeoutException:
-                        latest_ca_lplock = 'N/A'
+                        print(Fore.RED + 'Jewarch is down, waiting 60s to retry.')
+                        latest_ca = get_latest_ca_func()
 
-                    # Ownership
                     try:
-                        ownership_renounce_check = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
-                            EC.visibility_of_element_located((By.XPATH,
-                                                              "/html/body/div[2]/div[1]/div/div/div/div/div[3]/div[2]/ul/li[8]/span")))
-                        if ownership_renounce_check.text == ' Renounced ':
-                            latest_ca_ownership = True
-                        else:
-                            latest_ca_ownership = False
+                        latest_ca_link = latest_ca.get_attribute('href')
+                        latest_ca = latest_ca.get_attribute('href').replace('https://poocoin.app/tokens/', '')
+                    except AttributeError:
+                        print(Fore.RED + 'JewArch grabbing failed after 3 attempts, exiting...')
+                        # Simply .quit() didn't work on my system, so here i'm manually killing the Chrome windows with PIDs and task kill
+                        for process in psutil.process_iter():
+                            if process.name() == 'chrome.exe' and '--test-type=webdriver' in process.cmdline():
+                                with suppress(psutil.NoSuchProcess):
+                                    self.kill_list.append(process.pid)
+                        for proc_id in self.kill_list:
+                            os.kill(int(proc_id), signal.SIGTERM)
+                        quit()
 
-                    except selenium.common.exceptions.TimeoutException:
-                        latest_ca_ownership = 'N/A'
+                    if len(self.database['Contract']) > 0 and latest_ca in self.database["Contract"].values:
+                        print(Fore.CYAN + 'Contract already in database, continuing...')
+                        print(Fore.YELLOW + f'\nSleeping for {self.scraper_sleep_time} seconds...')
+                        time.sleep(self.scraper_sleep_time)
+                    else:
+                        print(Fore.YELLOW + 'New CA detected, getting info...')
 
-                    # Honeypot and Tax
-                    try:
-                        honeypot_url_ca = f'{self.honeypot_url}{latest_ca}'
-                        self.newest_ca_driver.get(honeypot_url_ca)
-                        honeypot_ornot = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
-                            EC.visibility_of_element_located((By.XPATH,
-                                                              "/html/body/div[2]/div[1]/div/div")))
-
+                        # Rugcheck
                         try:
-                            tax = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                            latest_ca_button = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
                                 EC.visibility_of_element_located((By.XPATH,
-                                                                  "/html/body/div[2]/div[1]/div/p[6]")))
-                            buy_tax = tax.text.split('%', 1)[0]
-                            sell_tax = tax.text.split('%', 1)[1]
+                                                                  "/html/body/div/div[2]/div/div[2]/div[1]/div[3]/div/div/div/table/tbody/tr[1]/td[3]/div/a")))
+                            latest_ca_button.click()
+                            try:
+                                rugcheck = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                                    EC.visibility_of_element_located((By.XPATH,
+                                                                      "/html/body/div[2]/div[1]/div/div/div/div/div[2]/button[4]/div/div/span")))
 
-                            buy_tax = float(
-                                buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
-                            sell_tax = float(
-                                sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
+                                alert_number = int(rugcheck.text)
+                                if alert_number > self.maximum_alerts:
+                                    self.exclude_list.append(latest_ca)
+                                is_scam = False
+                            except selenium.common.exceptions.TimeoutException:
+                                rugcheck = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                                    EC.visibility_of_element_located((By.XPATH,
+                                                                      "/html/body/div[2]/div[1]/div/div/div/div/div[2]/button[4]/div/span")))
+                                if rugcheck.get_attribute(
+                                        "title") == 'Moonarch rugcheck found suspicious code in the token contract':
+                                    alert_number = 'N/A'
+                                    is_scam = True
+                                    if latest_ca not in self.exclude_list:
+                                        self.exclude_list.append(latest_ca)
+                                else:
+                                    alert_number = 'N/A'
+                                    is_scam = False
 
-                        except IndexError:
+                        except selenium.common.exceptions.TimeoutException:
+                            alert_number = 'N/A'
+                            is_scam = 'N/A'
+
+                        # LP Lock
+                        try:
+                            lplock_or_not = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                                EC.visibility_of_element_located((By.XPATH,
+                                                                  "/html/body/div[2]/div[1]/div/div/div/div/div[2]/button[3]/span")))
+                            if lplock_or_not.text == '0':
+                                latest_ca_lplock = False
+                            elif lplock_or_not.text == '?':
+                                latest_ca_lplock = 'N/A'
+                            else:
+                                latest_ca_lplock = True
+
+                        except selenium.common.exceptions.TimeoutException:
+                            latest_ca_lplock = 'N/A'
+
+                        # Ownership
+                        try:
+                            ownership_renounce_check = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                                EC.visibility_of_element_located((By.XPATH,
+                                                                  "/html/body/div[2]/div[1]/div/div/div/div/div[3]/div[2]/ul/li[8]/span")))
+                            if ownership_renounce_check.text == ' Renounced ':
+                                latest_ca_ownership = True
+                            else:
+                                latest_ca_ownership = False
+
+                        except selenium.common.exceptions.TimeoutException:
+                            latest_ca_ownership = 'N/A'
+
+                        # Honeypot and Tax
+                        try:
+                            honeypot_url_ca = f'{self.honeypot_url}{latest_ca}'
+                            self.newest_ca_driver.get(honeypot_url_ca)
+                            honeypot_ornot = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                                EC.visibility_of_element_located((By.XPATH,
+                                                                  "/html/body/div[2]/div[1]/div/div")))
+
                             try:
                                 tax = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
                                     EC.visibility_of_element_located((By.XPATH,
-                                                                      "/html/body/div[2]/div[1]/div/p[5]")))
-
+                                                                      "/html/body/div[2]/div[1]/div/p[6]")))
                                 buy_tax = tax.text.split('%', 1)[0]
                                 sell_tax = tax.text.split('%', 1)[1]
 
@@ -243,120 +230,136 @@ class SniperOMancer:
                                     buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
                                 sell_tax = float(
                                     sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
+
                             except IndexError:
-                                tax = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
-                                    EC.visibility_of_element_located((By.XPATH,
-                                                                      "/html/body/div[2]/div[1]/div/p[9]")))
+                                try:
+                                    tax = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                                        EC.visibility_of_element_located((By.XPATH,
+                                                                          "/html/body/div[2]/div[1]/div/p[5]")))
 
-                                buy_tax = tax.text.split('%', 1)[0]
-                                sell_tax = tax.text.split('%', 1)[1]
+                                    buy_tax = tax.text.split('%', 1)[0]
+                                    sell_tax = tax.text.split('%', 1)[1]
 
-                                buy_tax = float(
-                                    buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
-                                sell_tax = float(
-                                    sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
+                                    buy_tax = float(
+                                        buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
+                                    sell_tax = float(
+                                        sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
+                                except IndexError:
+                                    tax = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                                        EC.visibility_of_element_located((By.XPATH,
+                                                                          "/html/body/div[2]/div[1]/div/p[9]")))
 
-                        if honeypot_ornot.text == 'Yup, honeypot. Run the fuck away.' or sell_tax >= self.maximum_sell_tax:
-                            latest_ca_honeypot = True
-                            if latest_ca not in self.exclude_list:
-                                self.exclude_list.append(latest_ca)
-                        else:
-                            latest_ca_honeypot = False
+                                    buy_tax = tax.text.split('%', 1)[0]
+                                    sell_tax = tax.text.split('%', 1)[1]
 
-                    except selenium.common.exceptions.TimeoutException:
-                        latest_ca_honeypot, buy_tax, sell_tax = 'N/A', 'N/A', 'N/A'
+                                    buy_tax = float(
+                                        buy_tax.replace('Buy Tax: ', '').replace('%', '').replace('\n', ''))
+                                    sell_tax = float(
+                                        sell_tax.replace('Sell Tax: ', '').replace('%', '').replace('\n', ''))
 
-                    self.newest_ca_driver.get(latest_ca_link)
+                            if honeypot_ornot.text == 'Yup, honeypot. Run the fuck away.' or sell_tax >= self.maximum_sell_tax:
+                                latest_ca_honeypot = True
+                                if latest_ca not in self.exclude_list:
+                                    self.exclude_list.append(latest_ca)
+                            else:
+                                latest_ca_honeypot = False
 
-                    try:
-                        latest_ca_name = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
-                            EC.visibility_of_element_located((
-                                By.XPATH,
-                                "/html/body/div[1]/div/div[1]/div[2]/div/div[2]/div[1]/div[1]/div/div[1]/div/h1"))).text
-                        latest_ca_name = latest_ca_name.split(' (', 1)[0]
-                    except selenium.common.exceptions.TimeoutException:
+                        except selenium.common.exceptions.TimeoutException:
+                            latest_ca_honeypot, buy_tax, sell_tax = 'N/A', 'N/A', 'N/A'
+
                         self.newest_ca_driver.get(latest_ca_link)
-                        latest_ca_name = self.newest_ca_driver.title
-                        latest_ca_name = latest_ca_name.split(' price', 1)[0]
 
-                    # Price and market cap
-                    try:
-                        latest_ca_price = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
-                            EC.visibility_of_element_located((By.XPATH,
-                                                              "/html/body/div[1]/div/div[1]/div[2]/div/div[2]/div[1]/div[1]/div/div[1]/div/span")))
                         try:
-                            latest_ca_price = float(latest_ca_price.text.replace('$', ''))
-                            latest_ca_price_forprint = f'{latest_ca_price:.20f}'
-                            fake_buy_token = True
-                        except ValueError:
-                            print(Fore.YELLOW + f'{latest_ca_name} has an unstable price, skipping price')
-                            latest_ca_price = 'N/A'
+                            latest_ca_name = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                                EC.visibility_of_element_located((
+                                    By.XPATH,
+                                    "/html/body/div[1]/div/div[1]/div[2]/div/div[2]/div[1]/div[1]/div/div[1]/div/h1"))).text
+                            latest_ca_name = latest_ca_name.split(' (', 1)[0]
+                        except selenium.common.exceptions.TimeoutException:
+                            self.newest_ca_driver.get(latest_ca_link)
+                            latest_ca_name = self.newest_ca_driver.title
+                            latest_ca_name = latest_ca_name.split(' price', 1)[0]
+
+                        # Price and market cap
+                        try:
+                            latest_ca_price = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                                EC.visibility_of_element_located((By.XPATH,
+                                                                  "/html/body/div[1]/div/div[1]/div[2]/div/div[2]/div[1]/div[1]/div/div[1]/div/span")))
+                            try:
+                                latest_ca_price = float(latest_ca_price.text.replace('$', ''))
+                                latest_ca_price_forprint = f'{latest_ca_price:.20f}'
+                                fake_buy_token = True
+                            except ValueError:
+                                print(Fore.YELLOW + f'{latest_ca_name} has an unstable price, skipping price')
+                                latest_ca_price = 'N/A'
+                                fake_buy_token = False
+
+                        except selenium.common.exceptions.TimeoutException:
+                            latest_ca_price, latest_ca_price_forprint = 'N/A', 'N/A'
                             fake_buy_token = False
 
-                    except selenium.common.exceptions.TimeoutException:
-                        latest_ca_price, latest_ca_price_forprint = 'N/A', 'N/A'
-                        fake_buy_token = False
-
-                    try:
-                        latest_ca_mcap = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
-                            EC.visibility_of_element_located((By.XPATH,
-                                                              "/html/body/div[1]/div/div[1]/div[2]/div/div[1]/div[2]/span[2]")))
                         try:
-                            latest_ca_mcap = float(latest_ca_mcap.text.replace('$', '').replace(',', ''))
-                            fake_buy_token = True
-                        except ValueError:
-                            print(Fore.YELLOW + f'{latest_ca_name} has an unstable market cap, skipping...')
+                            latest_ca_mcap = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                                EC.visibility_of_element_located((By.XPATH,
+                                                                  "/html/body/div[1]/div/div[1]/div[2]/div/div[1]/div[2]/span[2]")))
+                            try:
+                                latest_ca_mcap = float(latest_ca_mcap.text.replace('$', '').replace(',', ''))
+                                fake_buy_token = True
+                            except ValueError:
+                                print(Fore.YELLOW + f'{latest_ca_name} has an unstable market cap, skipping...')
+                                latest_ca_mcap = 'N/A'
+                                fake_buy_token = False
+
+                        except selenium.common.exceptions.TimeoutException:
                             latest_ca_mcap = 'N/A'
                             fake_buy_token = False
 
-                    except selenium.common.exceptions.TimeoutException:
-                        latest_ca_mcap = 'N/A'
-                        fake_buy_token = False
+                        if latest_ca_mcap != 'N/A' and latest_ca_mcap > 9999999:
+                            latest_ca_mcap = 'N/A'
+                            fake_buy_token = False
 
-                    if latest_ca_mcap != 'N/A' and latest_ca_mcap > 9999999:
-                        latest_ca_mcap = 'N/A'
-                        fake_buy_token = False
+                        # RugDoc
+                        rugdoc_link = f'{self.rugdoc_url}{latest_ca}&chain=bsc'
+                        rugdoc_status = requests.post(rugdoc_link).json()
+                        rugdoc_status = rugdoc_status['status']
+                        if rugdoc_status == 'OK':
+                            latest_ca_rugdoc = 'Clean'
+                        else:
+                            latest_ca_rugdoc = 'Dirty'
+                            self.exclude_list.append(latest_ca)
 
-                    # RugDoc
-                    rugdoc_link = f'{self.rugdoc_url}{latest_ca}&chain=bsc'
-                    rugdoc_status = requests.post(rugdoc_link).json()
-                    rugdoc_status = rugdoc_status['status']
-                    if rugdoc_status == 'OK':
-                        latest_ca_rugdoc = 'Clean'
-                    else:
-                        latest_ca_rugdoc = 'Dirty'
-                        self.exclude_list.append(latest_ca)
+                        if latest_ca in self.exclude_list:
+                            excluded = True
+                            print(Fore.RED + f'Added {latest_ca_name} to exclusion list.')
+                        else:
+                            excluded = False
 
-                    if latest_ca in self.exclude_list:
-                        excluded = True
-                        print(Fore.RED + f'Added {latest_ca_name} to exclusion list.')
-                    else:
-                        excluded = False
+                        if latest_ca_name != 'PooCoin BSC Charts':
+                            self.database.loc[len(self.database.index)] = [latest_ca_name, latest_ca, latest_ca_price,
+                                                                           latest_ca_mcap, buy_tax,
+                                                                           sell_tax, latest_ca_honeypot, latest_ca_rugdoc,
+                                                                           alert_number, is_scam, latest_ca_lplock,
+                                                                           latest_ca_ownership,
+                                                                           excluded, None, False]
 
-                    if latest_ca_name != 'PooCoin BSC Charts':
-                        print(Fore.CYAN + '\n----------------------------------------------')
-                        print(Fore.BLUE + 'NEW TOKEN')
-                        print(
-                            Fore.GREEN + f'Name: {Fore.WHITE}{latest_ca_name} \n{Fore.GREEN}CA: {Fore.WHITE}{latest_ca} \n{Fore.GREEN}Price: {Fore.WHITE}{latest_ca_price_forprint} \n{Fore.GREEN}Market Cap: {Fore.WHITE}{latest_ca_mcap} \n{Fore.GREEN}Buy Tax: {Fore.WHITE}{buy_tax} \n{Fore.GREEN}Sell Tax: {Fore.WHITE}{sell_tax} \n{Fore.GREEN}Rugcheck Alerts: {Fore.WHITE}{alert_number} \n{Fore.GREEN}Honeypot.is: {Fore.WHITE}{latest_ca_honeypot} \n{Fore.GREEN}RugDoc: {Fore.WHITE}{latest_ca_rugdoc} \n{Fore.GREEN}LP Lock: {Fore.WHITE}{latest_ca_lplock} \n{Fore.GREEN}Ownership renounced: {Fore.WHITE}{latest_ca_ownership}')
-                        print(Fore.CYAN + '----------------------------------------------')
+                            print(Fore.CYAN + '\n----------------------------------------------')
+                            print(Fore.BLUE + 'NEW TOKEN')
+                            print(
+                                Fore.GREEN + f'Name: {Fore.WHITE}{latest_ca_name} \n{Fore.GREEN}CA: {Fore.WHITE}{latest_ca} \n{Fore.GREEN}Price: {Fore.WHITE}{latest_ca_price_forprint} \n{Fore.GREEN}Market Cap: {Fore.WHITE}{latest_ca_mcap} \n{Fore.GREEN}Buy Tax: {Fore.WHITE}{buy_tax} \n{Fore.GREEN}Sell Tax: {Fore.WHITE}{sell_tax} \n{Fore.GREEN}Rugcheck Alerts: {Fore.WHITE}{alert_number} \n{Fore.GREEN}Honeypot.is: {Fore.WHITE}{latest_ca_honeypot} \n{Fore.GREEN}RugDoc: {Fore.WHITE}{latest_ca_rugdoc} \n{Fore.GREEN}LP Lock: {Fore.WHITE}{latest_ca_lplock} \n{Fore.GREEN}Ownership renounced: {Fore.WHITE}{latest_ca_ownership}')
+                            print(Fore.CYAN + '----------------------------------------------')
+                            print(Fore.YELLOW + f'\nAdded {latest_ca_name} to database...')
 
-                        self.database.loc[len(self.database.index)] = [latest_ca_name, latest_ca, latest_ca_price,
-                                                                       latest_ca_mcap, buy_tax,
-                                                                       sell_tax, latest_ca_honeypot, latest_ca_rugdoc,
-                                                                       alert_number, is_scam, latest_ca_lplock,
-                                                                       latest_ca_ownership,
-                                                                       excluded, None, False]
-                        print(Fore.YELLOW + f'\nAdded {latest_ca_name} to database...')
+                            if fake_buy_token:
+                                t6 = threading.Thread(target=self.tx_handler,
+                                                      args=(latest_ca_name, latest_ca, latest_ca_price, None, True,),
+                                                      daemon=True)
+                                t6.start()
 
-                        if fake_buy_token:
-                            t6 = threading.Thread(target=self.tx_handler,
-                                                  args=(latest_ca_name, latest_ca, latest_ca_price, None, True,),
-                                                  daemon=True)
-                            t6.start()
-
-                        self.inoperation = False
-                        print(Fore.YELLOW + f'\nSleeping for {self.scraper_sleep_time} seconds...')
-                        time.sleep(self.scraper_sleep_time)
+                            self.inoperation = False
+                            print(Fore.YELLOW + f'\nSleeping for {self.scraper_sleep_time} seconds...')
+                            time.sleep(self.scraper_sleep_time)
+            except ValueError:
+                time.sleep(self.scraper_sleep_time)
 
     def updater(self, info):
         while True:
@@ -552,12 +555,13 @@ class SniperOMancer:
 
     def token_watcher(self, ca, ca_name):
         fake_token_holding = True
-        fake_ca_database_index = self.database.index[self.database['Contract'] == ca].tolist()[0]
-        fake_ca_fake_buy_index = self.fake_buy_database.index[self.fake_buy_database['Contract'] == ca].tolist()[0]
         while True:
             if self.reset_done:
                 time.sleep(1)
             else:
+                fake_ca_database_index = self.database.index[self.database['Contract'] == ca].tolist()[0]
+                fake_ca_fake_buy_index = \
+                self.fake_buy_database.index[self.fake_buy_database['Contract'] == ca].tolist()[0]
                 if self.fake_buy_database['Contract'][fake_ca_fake_buy_index] not in self.exclude_list and \
                         self.database['Price'][fake_ca_database_index] != 'N/A':
                     fake_ca_database_index = self.database.index[self.database['Contract'] == ca].tolist()[0]
@@ -710,6 +714,7 @@ class SniperOMancer:
                         self.reset_done = True
                         self.database = self.database[self.database['Xs'].notna()]
                         self.database = self.database[self.database['Finished'] == False]
+                        self.database = self.database.reset_index().drop(columns=['index'])
                         time.sleep(5)
                         self.reset_done = False
                         print(Fore.RED + 'Done')
