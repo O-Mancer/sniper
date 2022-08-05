@@ -19,8 +19,6 @@ from selenium.webdriver.chrome.options import Options
 from contextlib import suppress
 import psutil
 from termcolor import cprint
-from time import gmtime
-from time import strftime
 
 init(autoreset=True, strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
 
@@ -34,7 +32,7 @@ def percentage(percent, whole):
 
 class SniperOMancer:
     def __init__(self):
-        self.version = 'v0.0.9 Alpha'
+        self.version = 'v0.0.9.1 Alpha'
 
         # SETTINGS
         self.wallet_address = ''
@@ -596,7 +594,7 @@ class SniperOMancer:
                 fake_ca_fake_buy_index = \
                     self.fake_buy_database.index[self.fake_buy_database['Contract'] == ca].tolist()[0]
                 if self.fake_buy_database['Contract'][fake_ca_fake_buy_index] not in self.exclude_list and \
-                        self.database['Price'][fake_ca_database_index] != 'N/A':
+                        self.database['Price'][fake_ca_database_index] != 'N/A' and self.database['Finished'][fake_ca_database_index] == False:
                     fake_ca_database_index = self.database.index[self.database['Contract'] == ca].tolist()[0]
                     fake_ca_fake_buy_index = \
                         self.fake_buy_database.index[self.fake_buy_database['Contract'] == ca].tolist()[0]
