@@ -32,7 +32,7 @@ def percentage(percent, whole):
 
 class SniperOMancer:
     def __init__(self):
-        self.version = 'v0.1 Alpha'
+        self.version = 'v0.1.1 Alpha'
 
         # SETTINGS
         self.wallet_address = ''
@@ -659,15 +659,29 @@ class SniperOMancer:
                     else:
                         time.sleep(self.fake_mode_sleep)
                 elif self.database['Finished'][fake_ca_database_index] == True:
+                    fake_ca_database_index = self.database.index[self.database['Contract'] == ca].tolist()[0]
+                    fake_ca_fake_buy_index = self.fake_buy_database.index[self.fake_buy_database['Contract'] == ca].tolist()[0]
+                    remove_ca_name = self.fake_buy_database['Name'][fake_ca_fake_buy_index]
                     token_x = float(self.database['Xs'][fake_ca_database_index])
                     profit = self.fake_buy*token_x
+                    self.fake_balance = self.fake_balance+profit
                     if profit > self.fake_buy:
+                        try:
+                            self.fake_buy_current_list.remove(remove_ca_name)
+                        except ValueError:
+                            pass
                         self.write(Fore.GREEN + f'{ca_name} sold at a {token_x}x profit because of inactivity!')
                     elif profit < self.fake_buy:
                         self.write(Fore.RED + f'{ca_name} sold at a {token_x}x loss because of inactivity!')
                     break
                 else:
+                    fake_ca_fake_buy_index = self.fake_buy_database.index[self.fake_buy_database['Contract'] == ca].tolist()[0]
+                    remove_ca_name = self.fake_buy_database['Name'][fake_ca_fake_buy_index]
                     self.write(Fore.RED + f'Money in {ca_name} lost!')
+                    try:
+                        self.fake_buy_current_list.remove(remove_ca_name)
+                    except ValueError:
+                        pass
                     break
 
     def tx_handler(self, ca_name, ca, entry_price, index_n, verbose):
