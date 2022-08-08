@@ -4,6 +4,6 @@ I will create a whitepaper soon for this repository, but for now heres the basic
 
 Bot scans every 5 seconds by default for new contracts on JewArch. Once the new contract has been added to the database, it will be monitored for any activity and possible entries.
 
-Right now only paperbetting (or "fake" buying internally) is supported, as this program is only for educational purposes.
+Includes several helpers and rug detectors to help out.
 
 Adjust settings and run.
