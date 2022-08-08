@@ -64,7 +64,7 @@ class SniperOMancer:
     # Init
     def __init__(self):
         self.write(Fore.BLUE + 'Initializing...')
-        self.version = 'v0.1.2.3 Alpha'
+        self.version = 'v0.1.2.4 Alpha'
 
         # SETTINGS
         self.buy_mode = False
@@ -74,8 +74,8 @@ class SniperOMancer:
 
         self.maximum_buy_tax = 10
         self.maximum_sell_tax = 10
-        self.minimum_market_cap = 500
-        self.minimum_liquidity = 1000
+        self.minimum_market_cap = 50
+        self.minimum_liquidity = 500
         self.analyze_mc_liq_ratio = True
         self.lp_lock = False
         self.ownership_renounce = False
@@ -490,7 +490,7 @@ class SniperOMancer:
                             except selenium.common.exceptions.TimeoutException:
                                 latest_ca_lplock = False
 
-                        except KeyError:
+                        except (KeyError, selenium.common.exceptions.TimeoutException):
                             latest_ca_verified = 'N/A'
                             latest_ca_lplock = 'N/A'
 
@@ -795,7 +795,7 @@ class SniperOMancer:
                                     except selenium.common.exceptions.TimeoutException:
                                         self.database['LP Lock'][i] = False
                             time.sleep(self.updater_sleep_time)
-                        except KeyError:
+                        except (KeyError, selenium.common.exceptions.TimeoutException):
                             time.sleep(self.updater_sleep_time)
 
     # Monitors and sells bought tokens
