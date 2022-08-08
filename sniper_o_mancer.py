@@ -64,7 +64,7 @@ class SniperOMancer:
     # Init
     def __init__(self):
         self.write(Fore.BLUE + 'Initializing...')
-        self.version = 'v0.1.2.2 Alpha'
+        self.version = 'v0.1.2.3 Alpha'
 
         # SETTINGS
         self.buy_mode = False
@@ -459,28 +459,40 @@ class SniperOMancer:
                         ##################################################
                         # LP Lock and Contract Verification via Moonarch #
                         ##################################################
-                        latest_ca_moonarch_link = f'{self.moonarch_url}{latest_ca}'
-                        self.newest_ca_driver.get(latest_ca_moonarch_link)
-                        latest_ca_verified = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
-                            EC.visibility_of_element_located((
-                                By.XPATH,
-                                "/html/body/div/div[3]/div[2]/div/div/div[3]/div[2]/div[1]"))).get_attribute("class")
-                        if latest_ca_verified == 'not-verified':
-                            latest_ca_verified = False
-                        else:
-                            latest_ca_verified = True
-
                         try:
-                            lplock = WebDriverWait(self.newest_ca_driver,
-                                                   self.max_scraper_wait).until(
-                                EC.visibility_of_element_located((By.XPATH,
-                                                                  "/html/body/div/div[3]/div[2]/div/div/div[3]/div[1]/div/div/h5"))).text
-                            if lplock == 'Liquidity locks on PancakeSwap v2':
-                                latest_ca_lplock = True
+                            latest_ca_moonarch_link = f'{self.moonarch_url}{latest_ca}'
+                            try:
+                                self.newest_ca_driver.get(latest_ca_moonarch_link)
+                            except selenium.common.exceptions.WebDriverException:
+                                try:
+                                    self.newest_ca_driver.get(latest_ca_moonarch_link)
+                                except selenium.common.exceptions.WebDriverException:
+                                    raise KeyError
+
+                            latest_ca_verified = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
+                                EC.visibility_of_element_located((
+                                    By.XPATH,
+                                    "/html/body/div/div[3]/div[2]/div/div/div[3]/div[2]/div[1]"))).get_attribute("class")
+                            if latest_ca_verified == 'not-verified':
+                                latest_ca_verified = False
                             else:
+                                latest_ca_verified = True
+
+                            try:
+                                lplock = WebDriverWait(self.newest_ca_driver,
+                                                       self.max_scraper_wait).until(
+                                    EC.visibility_of_element_located((By.XPATH,
+                                                                      "/html/body/div/div[3]/div[2]/div/div/div[3]/div[1]/div/div/h5"))).text
+                                if lplock == 'Liquidity locks on PancakeSwap v2':
+                                    latest_ca_lplock = True
+                                else:
+                                    latest_ca_lplock = False
+                            except selenium.common.exceptions.TimeoutException:
                                 latest_ca_lplock = False
-                        except selenium.common.exceptions.TimeoutException:
-                            latest_ca_lplock = False
+
+                        except KeyError:
+                            latest_ca_verified = 'N/A'
+                            latest_ca_lplock = 'N/A'
 
                         if latest_ca in self.exclude_list:
                             excluded = True
@@ -761,7 +773,14 @@ class SniperOMancer:
                                     break
                                 else:
                                     lplock_url_ca = f'{self.moonarch_url}{current_contract}'
-                                    self.lplock_updater_driver.get(lplock_url_ca)
+                                    try:
+                                        self.lplock_updater_driver.get(lplock_url_ca)
+                                    except selenium.common.exceptions.WebDriverException:
+                                        try:
+                                            self.lplock_updater_driver.get(lplock_url_ca)
+                                        except selenium.common.exceptions.WebDriverException:
+                                            raise KeyError
+
                                     try:
                                         lplock = WebDriverWait(self.lplock_updater_driver,
                                                                self.max_scraper_wait).until(
