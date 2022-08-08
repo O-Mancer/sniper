@@ -64,13 +64,13 @@ class SniperOMancer:
     # Init
     def __init__(self):
         self.write(Fore.BLUE + 'Initializing...')
-        self.version = 'v0.1.2 Alpha'
+        self.version = 'v0.1.2.1 Alpha'
 
         # SETTINGS
         self.buy_mode = False
         self.wallet_address = ''
         self.private_key = ''
-        self.buy_amount = 0
+        self.buy_amount = 0.01
 
         self.maximum_buy_tax = 10
         self.maximum_sell_tax = 10
@@ -1079,7 +1079,7 @@ class SniperOMancer:
                 Fore.RED + 'Both real and fake buying is enabled. Simultaneous betting is currently not supported and will cause problems. quitting...')
             quit()
 
-        if self.buy_mode and (self.wallet_address != '' and self.private_key != ''):
+        if self.buy_mode and self.wallet_address != '' and self.private_key != '':
             self.fake_balance = 100000000000000000000
             self.real_balance = self.get_balance()
             balance_overview = self.real_balance
@@ -1088,6 +1088,8 @@ class SniperOMancer:
         elif self.wallet_address == '' or self.private_key == '':
             self.write(Fore.RED + 'You have buy mode enabled, but no wallet/private key could be found. Quitting...')
             quit()
+        else:
+            self.real_balance = 'N/A'
 
         if self.txn_speed == 'standard':
             self.txn_speed = 5
