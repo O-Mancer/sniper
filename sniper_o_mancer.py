@@ -64,7 +64,7 @@ class SniperOMancer:
     # Init
     def __init__(self):
         self.write(Fore.BLUE + 'Initializing...')
-        self.version = 'v0.1.2.1 Alpha'
+        self.version = 'v0.1.2.2 Alpha'
 
         # SETTINGS
         self.buy_mode = False
@@ -83,7 +83,7 @@ class SniperOMancer:
         self.maximum_alerts = 5
         self.txn_speed = 'standard'
 
-        self.fake_mode = False
+        self.fake_mode = True
         self.token_watcher_sleep = 5
         self.fake_balance = 10
         self.fake_buy = 1
@@ -1113,8 +1113,9 @@ class SniperOMancer:
         except requests.exceptions.HTTPError:
             self.write(Fore.RED + f'RPC ({self.RPC}) 502 error, remove from list if it keeps happening...')
             quit()
-        self.write(Fore.YELLOW + f'ADDRESS: {Fore.WHITE}{self.wallet_address}')
-        self.write(Fore.YELLOW + f'WALLET BALANCE: {Fore.WHITE}{self.real_balance} BNB')
+        if self.buy_mode:
+            self.write(Fore.YELLOW + f'ADDRESS: {Fore.WHITE}{self.wallet_address}')
+            self.write(Fore.YELLOW + f'WALLET BALANCE: {Fore.WHITE}{self.real_balance} BNB')
 
         ##MAIN THREAD
         try:
