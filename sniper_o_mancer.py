@@ -12,23 +12,9 @@
 # ASCII AART HAHAHA
 # BY °° YOSHARU °° 2022
 # CHANGELOG:
-# v0.1.2:
-# - First changelog.
-# - Added LP and MC/LP analysis.
-# - Added RPC optimization.
-# - Added buying/selling of tokens with real wallet.
-# - Added honeypot and too high tax loss.
-# - Added LP Lock updating.
-# - Added MoonArch analysis for even more security.
-# - Added a bunch of comments.
-# - Added more error catching to minimize errors without sacrificing code quality.
-# - Added ASCII lol.
-# - Added rounded buy and sell taxes.
-# - Fixed print.
-# - Fixed initial honeypot and tax grab.
-# - Made variables and internals more understandable for future development.
-# - Changed maximum minutes in DB from 60 to 30.
-# - Redefined codebase.
+# v0.1.3:
+# - Removed Moonarch scraping (ip ban) (this removes LP lock checking and contract verification checking, although contract verification checking will 100% be added to the next update)
+# - Fixed major bugs
 #
 # TIP JAR:
 # BSC & ETH: 0x930A400a816D702f4b81B143863859154d7ea209
@@ -64,7 +50,7 @@ class SniperOMancer:
     # Init
     def __init__(self):
         self.write(Fore.BLUE + 'Initializing...')
-        self.version = 'v0.1.2.4 Alpha'
+        self.version = 'v0.1.3 Alpha'
 
         # SETTINGS
         self.buy_mode = False
@@ -77,9 +63,7 @@ class SniperOMancer:
         self.minimum_market_cap = 50
         self.minimum_liquidity = 500
         self.analyze_mc_liq_ratio = True
-        self.lp_lock = False
         self.ownership_renounce = False
-        self.verified_contract = False
         self.maximum_alerts = 5
         self.txn_speed = 'standard'
 
@@ -141,8 +125,7 @@ class SniperOMancer:
                      'Honeypot.is',
                      'RugDoc',
                      'Rugcheck Alerts', 'Scam',
-                     'LP Lock',
-                     'Ownership Renounced', 'Verified', 'Excluded', 'Xs', 'Finished'])
+                     'Ownership Renounced', 'Excluded', 'Xs', 'Finished'])
         self.internal_database = pd.DataFrame(columns=['Name', 'Contract', 'Entry', 'Current'])
         self.fake_buy_current_list = []
         self.exclude_list = []
@@ -456,44 +439,6 @@ class SniperOMancer:
                             latest_ca_rugdoc = 'Dirty'
                             self.exclude_list.append(latest_ca)
 
-                        ##################################################
-                        # LP Lock and Contract Verification via Moonarch #
-                        ##################################################
-                        try:
-                            latest_ca_moonarch_link = f'{self.moonarch_url}{latest_ca}'
-                            try:
-                                self.newest_ca_driver.get(latest_ca_moonarch_link)
-                            except selenium.common.exceptions.WebDriverException:
-                                try:
-                                    self.newest_ca_driver.get(latest_ca_moonarch_link)
-                                except selenium.common.exceptions.WebDriverException:
-                                    raise KeyError
-
-                            latest_ca_verified = WebDriverWait(self.newest_ca_driver, self.max_scraper_wait).until(
-                                EC.visibility_of_element_located((
-                                    By.XPATH,
-                                    "/html/body/div/div[3]/div[2]/div/div/div[3]/div[2]/div[1]"))).get_attribute("class")
-                            if latest_ca_verified == 'not-verified':
-                                latest_ca_verified = False
-                            else:
-                                latest_ca_verified = True
-
-                            try:
-                                lplock = WebDriverWait(self.newest_ca_driver,
-                                                       self.max_scraper_wait).until(
-                                    EC.visibility_of_element_located((By.XPATH,
-                                                                      "/html/body/div/div[3]/div[2]/div/div/div[3]/div[1]/div/div/h5"))).text
-                                if lplock == 'Liquidity locks on PancakeSwap v2':
-                                    latest_ca_lplock = True
-                                else:
-                                    latest_ca_lplock = False
-                            except selenium.common.exceptions.TimeoutException:
-                                latest_ca_lplock = False
-
-                        except (KeyError, selenium.common.exceptions.TimeoutException):
-                            latest_ca_verified = 'N/A'
-                            latest_ca_lplock = 'N/A'
-
                         if latest_ca in self.exclude_list:
                             excluded = True
                             self.write(Fore.RED + f'Added {latest_ca_name} to exclusion list.')
@@ -519,12 +464,11 @@ class SniperOMancer:
                                                                            latest_ca_sell_tax, latest_ca_honeypot,
                                                                            latest_ca_rugdoc,
                                                                            latest_ca_alert_number, latest_ca_scam,
-                                                                           latest_ca_lplock,
-                                                                           latest_ca_ownership, latest_ca_verified,
+                                                                           latest_ca_ownership,
                                                                            excluded, None, False]
 
                             print(
-                                Fore.CYAN + f'\n----------------------------------------------\n{Fore.BLUE}NEW TOKEN\n{Fore.GREEN}Name: {Fore.WHITE}{latest_ca_name} \n{Fore.GREEN}CA: {Fore.WHITE}{latest_ca} \n{Fore.GREEN}Price: {Fore.WHITE}{latest_ca_price_forprint} \n{Fore.GREEN}Market Cap: {Fore.WHITE}{latest_ca_mcap}\n{Fore.GREEN}LP: {Fore.WHITE}{latest_ca_liquidity} \n{Fore.GREEN}Buy Tax: {Fore.WHITE}{latest_ca_buy_tax} \n{Fore.GREEN}Sell Tax: {Fore.WHITE}{latest_ca_sell_tax} \n{Fore.GREEN}Rugcheck Alerts: {Fore.WHITE}{latest_ca_alert_number} \n{Fore.GREEN}Honeypot.is: {Fore.WHITE}{latest_ca_honeypot} \n{Fore.GREEN}RugDoc: {Fore.WHITE}{latest_ca_rugdoc} \n{Fore.GREEN}LP Lock: {Fore.WHITE}{latest_ca_lplock} \n{Fore.GREEN}Ownership renounced: {Fore.WHITE}{latest_ca_ownership}\n{Fore.GREEN}Verified: {Fore.WHITE}{latest_ca_verified}\n{Fore.CYAN}----------------------------------------------\n')
+                                Fore.CYAN + f'\n----------------------------------------------\n{Fore.BLUE}NEW TOKEN\n{Fore.GREEN}Name: {Fore.WHITE}{latest_ca_name} \n{Fore.GREEN}CA: {Fore.WHITE}{latest_ca} \n{Fore.GREEN}Price: {Fore.WHITE}{latest_ca_price_forprint} \n{Fore.GREEN}Market Cap: {Fore.WHITE}{latest_ca_mcap}\n{Fore.GREEN}LP: {Fore.WHITE}{latest_ca_liquidity} \n{Fore.GREEN}Buy Tax: {Fore.WHITE}{latest_ca_buy_tax} \n{Fore.GREEN}Sell Tax: {Fore.WHITE}{latest_ca_sell_tax} \n{Fore.GREEN}Rugcheck Alerts: {Fore.WHITE}{latest_ca_alert_number} \n{Fore.GREEN}Honeypot.is: {Fore.WHITE}{latest_ca_honeypot} \n{Fore.GREEN}RugDoc: {Fore.WHITE}{latest_ca_rugdoc}\n{Fore.GREEN}Ownership renounced: {Fore.WHITE}{latest_ca_ownership}\n{Fore.CYAN}----------------------------------------------\n')
                             self.write(Fore.YELLOW + f'Added {latest_ca_name} to database...')
 
                             t6 = threading.Thread(target=self.tx_handler,
@@ -760,44 +704,6 @@ class SniperOMancer:
                         except KeyError:
                             time.sleep(self.updater_sleep_time)
 
-                elif info == 'lplock':
-                    ###########
-                    # LP Lock #
-                    ###########
-                    while True:
-                        try:
-                            for i in range(len(self.database['Contract'])):
-                                current_contract = self.database['Contract'][i]
-                                ca_name = self.database['Name'][i]
-                                if self.reset_done:
-                                    break
-                                else:
-                                    lplock_url_ca = f'{self.moonarch_url}{current_contract}'
-                                    try:
-                                        self.lplock_updater_driver.get(lplock_url_ca)
-                                    except selenium.common.exceptions.WebDriverException:
-                                        try:
-                                            self.lplock_updater_driver.get(lplock_url_ca)
-                                        except selenium.common.exceptions.WebDriverException:
-                                            raise KeyError
-
-                                    try:
-                                        lplock = WebDriverWait(self.lplock_updater_driver,
-                                                               self.max_scraper_wait).until(
-                                            EC.visibility_of_element_located((By.XPATH,
-                                                                              "/html/body/div/div[3]/div[2]/div/div/div[3]/div[1]/div/div/h5"))).text
-                                        if lplock == 'Liquidity locks on PancakeSwap v2':
-                                            if self.database['LP Lock'][i] == 'N/A' or self.database['LP Lock'][i] == False:
-                                                self.write(Fore.GREEN + f'{ca_name} just locked their LP!')
-                                            self.database['LP Lock'][i] = True
-                                        else:
-                                            self.database['LP Lock'][i] = False
-                                    except selenium.common.exceptions.TimeoutException:
-                                        self.database['LP Lock'][i] = False
-                            time.sleep(self.updater_sleep_time)
-                        except (KeyError, selenium.common.exceptions.TimeoutException):
-                            time.sleep(self.updater_sleep_time)
-
     # Monitors and sells bought tokens
     def token_watcher(self, ca, ca_name):
         while True:
@@ -981,11 +887,7 @@ class SniperOMancer:
                 else:
                     ratio_sus = False
 
-                lplock_v = self.database['LP Lock'][ca_index]
-                if self.lp_lock == False:
-                    lplock_v = True
-
-                if buy_tax <= self.maximum_buy_tax and sell_tax <= self.maximum_sell_tax and rugcheck_v <= self.maximum_alerts and honeypot_v == 'False' and buy_tax != 'N/A' and sell_tax != 'N/A' and rugdoc_v == 'Clean' and mcap_v >= self.minimum_market_cap and lp_v >= self.minimum_liquidity and ratio_sus is False and lplock_v == True and ca_x == None and ownership_v == True:
+                if buy_tax <= self.maximum_buy_tax and sell_tax <= self.maximum_sell_tax and rugcheck_v <= self.maximum_alerts and honeypot_v == 'False' and buy_tax != 'N/A' and sell_tax != 'N/A' and rugdoc_v == 'Clean' and mcap_v >= self.minimum_market_cap and lp_v >= self.minimum_liquidity and ratio_sus is False and ca_x == None and ownership_v == True:
                     try:
                         buy_tax = float(self.database['Buy Tax'][ca_index])
                     except ValueError:
@@ -1008,12 +910,11 @@ class SniperOMancer:
                     t4.start()
 
                     if self.telegram_enabled:
-                        lp_lock = self.database['LP Lock'][ca_index]
                         ownership = self.database['Ownership Renounced'][ca_index]
                         poocoin_link = f'[💩](https://poocoin.app/tokens/{ca})'
                         dexscreener_link = f'[🤖](https://dexscreener.com/bsc/{ca})'
                         moonarch_link = f'[🌙](https://moonarch.app/token/{ca})'
-                        tgmessage = f'*NEWLY LAUNCHED SHITCOIN DETECTED:* %0A *Name*: {ca_name} %0A *CA*: {ca} %0A *Price*: {price_v} %0A *Market Cap*: {mcap_v} %0A *LP*: {lp_v} %0A *Buy Tax*: {buy_tax} %0A *Sell Tax*: {sell_tax} %0A *Honeypot.is*: {honeypot_v} %0A *RugDoc*: {rugdoc_v} %0A *LP Lock*: {lp_lock} %0A *Ownership renounced*: {ownership} %0A {poocoin_link} %0A {dexscreener_link} %0A {moonarch_link} %0A%0A _If i posted the CA, this means it passed Honeypot.is, Rugcheck and RugDoc. It does NOT guarantee future results._ %0A_Not financial advice, DYOR!_'
+                        tgmessage = f'*NEWLY LAUNCHED SHITCOIN DETECTED:* %0A *Name*: {ca_name} %0A *CA*: {ca} %0A *Price*: {price_v} %0A *Market Cap*: {mcap_v} %0A *LP*: {lp_v} %0A *Buy Tax*: {buy_tax} %0A *Sell Tax*: {sell_tax} %0A *Honeypot.is*: {honeypot_v} %0A *RugDoc*: {rugdoc_v} %0A *Ownership renounced*: {ownership} %0A {poocoin_link} %0A {dexscreener_link} %0A {moonarch_link} %0A%0A _If i posted the CA, this means it passed Honeypot.is, Rugcheck and RugDoc. It does NOT guarantee future results._ %0A_Not financial advice, DYOR!_'
                         requests.post(
                             f'https://api.telegram.org/bot{self.telegram_bot_key}/sendMessage?chat_id={self.telegram_bot_chat_id}&text={tgmessage}&parse_mode=Markdown')
                         self.write(Fore.CYAN + 'Telegram message sent')
@@ -1032,9 +933,6 @@ class SniperOMancer:
                 elif ratio_sus:
                     if verbose:
                         self.write(Fore.RED + f'{ca_name} had a sus MC/LP ratio and was not bought!')
-                elif lplock_v == False and self.lp_lock:
-                    if verbose:
-                        self.write(Fore.RED + f'{ca_name} had no LP Lock and was not bought!')
                 elif mcap_v <= self.minimum_market_cap:
                     if verbose:
                         self.write(
@@ -1142,11 +1040,9 @@ class SniperOMancer:
             t1 = threading.Thread(target=self.scrape_newest_ca, daemon=True)
             t2 = threading.Thread(target=self.updater, args=('price',), daemon=True)
             t3 = threading.Thread(target=self.updater, args=('honeypot',), daemon=True)
-            t4 = threading.Thread(target=self.updater, args=('lplock',), daemon=True)
             t1.start()
             t2.start()
             t3.start()
-            t4.start()
             self.write(Fore.CYAN + 'Threads started')
             time.sleep(5)
             while True:
