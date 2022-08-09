@@ -113,7 +113,6 @@ class SniperOMancer:
         self.newest_ca_driver = webdriver.Chrome(options=self.op)
         self.price_updater_driver = webdriver.Chrome(options=self.op)
         self.honeypot_updater_driver = webdriver.Chrome(options=self.op)
-        self.lplock_updater_driver = webdriver.Chrome(options=self.op)
         self.kill_list = []
         self.inoperation = None
         self.jewarch_url = 'http://70.34.213.32'
