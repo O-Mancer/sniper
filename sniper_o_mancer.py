@@ -161,7 +161,11 @@ class SniperOMancer:
                     # print(Fore.YELLOW + '\nScraping newest jewarch CA...')
                     latest_ca = None
                     contract = self.listening_contract
-                    event_filter = contract.events.PairCreated.createFilter(fromBlock='latest').get_new_entries()
+                    try:
+                        event_filter = contract.events.PairCreated.createFilter(fromBlock='latest').get_new_entries()
+                    except requests.exceptions.HTTPError:
+                        event_filter = None
+
                     if event_filter is not None:
                         for PairCreated in event_filter:
                             jsonEventContents = json.loads(Web3.toJSON(PairCreated))
@@ -1012,17 +1016,20 @@ class SniperOMancer:
                 except statistics.StatisticsError:
                     average_x = 'N/A'
 
-                if len(self.database.index) > 1:
+                if len(self.database.index) > 0:
                     print(
                         f'\n{Fore.CYAN}-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n{Fore.YELLOW}Overview:\nBalance: {Fore.WHITE}{balance_overview} BNB\n{Fore.YELLOW}Average Xs:{Fore.WHITE} {average_x}\n\n{Fore.YELLOW}Database:{Fore.WHITE}\n{self.database}\n\n{Fore.YELLOW}Currently holding:\n{Fore.WHITE}{self.fake_buy_current_list}\n\n{Fore.YELLOW}System:{Fore.WHITE}\n{Fore.YELLOW}Time: {Fore.WHITE}{current_time}\n{Fore.YELLOW}Uptime: {Fore.WHITE}{n_uptime}\n{Fore.YELLOW}Version: {Fore.WHITE}{self.version}\n{Fore.CYAN}-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n')
                 if len(self.database.index) >= maximum_database_index:
-                    self.write(Fore.RED + 'Purging inactive tokens...')
-                    self.reset_done = True
-                    self.database = self.database[self.database['Xs'].notna()]
-                    self.database = self.database[self.database['Finished'] == False]
-                    self.database = self.database.reset_index().drop(columns=['index'])
-                    time.sleep(5)
-                    self.reset_done = False
+                    try:
+                        self.write(Fore.RED + 'Purging inactive tokens...')
+                        self.reset_done = True
+                        self.database = self.database[self.database['Xs'].notna()]
+                        self.database = self.database[self.database['Finished'] == False]
+                        self.database = self.database.reset_index().drop(columns=['index'])
+                        time.sleep(5)
+                        self.reset_done = False
+                    except Exception as e:
+                        print(e)
                 time.sleep(overview_sleep_time)
         except (KeyboardInterrupt, Exception) as e:
             if e == '':
