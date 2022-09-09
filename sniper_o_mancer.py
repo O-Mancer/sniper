@@ -406,23 +406,23 @@ class SniperOMancer:
 
                 if (str(tokenContractCode['result'][0][
                             'ABI']) == "Contract source code not verified") and checkSourceCode is True:  # check if source code is verified
-                    self.write(Fore.RED + "[MiniAudit] Contract source code isn't verified.")
+                    # self.write(Fore.RED + "[MiniAudit] Contract source code isn't verified.")
                     return 'Bad'
 
                 elif ("0x05fF2B0DB69458A0750badebc4f9e13aDd608C7F" in str(tokenContractCode['result'][0][
                                                                               'SourceCode'])) and checkPancakeV1Router is True:  # check if pancakeswap v1 router is used
-                    self.write(Fore.RED + "[MiniAudit] Contract uses PancakeSwap v1 router.")
+                    # self.write(Fore.RED + "[MiniAudit] Contract uses PancakeSwap v1 router.")
                     return 'Bad'
 
 
                 elif (str(pancakeSwapRouterAddress) not in str(tokenContractCode['result'][0][
                                                                    'SourceCode'])) and checkValidPancakeV2 is True:  # check if pancakeswap v2 router is used
-                    self.write(Fore.RED + "[MiniAudit] Contract doesn't use valid PancakeSwap v2 router.")
+                    # self.write(Fore.RED + "[MiniAudit] Contract doesn't use valid PancakeSwap v2 router.")
                     return 'Bad'
 
                 elif "mint" in str(tokenContractCode['result'][0][
                                        'SourceCode']) and checkMintFunction is True:  # check if any mint function enabled
-                    self.write(Fore.RED + "[MiniAudit] Contract has mint function enabled.")
+                    # self.write(Fore.RED + "[MiniAudit] Contract has mint function enabled.")
                     return 'Bad'
 
 
@@ -432,7 +432,7 @@ class SniperOMancer:
                         'SourceCode']) or "function _approve(address owner, address spender, uint256 amount) internal" in str(
                     tokenContractCode['result'][0]['SourceCode']) or "newun" in str(tokenContractCode['result'][0][
                                                                                         'SourceCode'])) and checkHoneypot is True:  # check if token is honeypot
-                    self.write(Fore.RED + "[MiniAudit] Contract is a honeypot.")
+                    # self.write(Fore.RED + "[MiniAudit] Contract is a honeypot.")
                     return 'Bad'
 
                 else:
@@ -998,7 +998,7 @@ class SniperOMancer:
             t2.start()
             t3.start()
             self.write(Fore.CYAN + 'Threads successfully started!')
-            self.write(Fore.CYAN + 'New tokens that fit your config will appear in this window.')
+            self.write(Fore.CYAN + 'Only new tokens that fit your config will appear in this window.')
             time.sleep(5)
             while True:
                 n_uptime = self.get_uptime()
