@@ -247,6 +247,8 @@ class SniperOMancer:
                             #############
                             if enableMiniAudit is True:
                                 latest_ca_miniaudit = self.miniAudit(latest_ca)
+                                if latest_ca_miniaudit == 'Bad':
+                                    self.exclude_list.append(latest_ca)
                             else:
                                 latest_ca_miniaudit = None
 
