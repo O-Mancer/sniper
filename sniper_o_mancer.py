@@ -405,23 +405,23 @@ class SniperOMancer:
                 tokenContractCode = contractCodeRequest.json()
 
                 if (str(tokenContractCode['result'][0][
-                            'ABI']) == "Contract source code not verified") and checkSourceCode == "True":  # check if source code is verified
+                            'ABI']) == "Contract source code not verified") and checkSourceCode is True:  # check if source code is verified
                     self.write(Fore.RED + "[MiniAudit] Contract source code isn't verified.")
                     return 'Bad'
 
                 elif ("0x05fF2B0DB69458A0750badebc4f9e13aDd608C7F" in str(tokenContractCode['result'][0][
-                                                                              'SourceCode'])) and checkPancakeV1Router == "True":  # check if pancakeswap v1 router is used
+                                                                              'SourceCode'])) and checkPancakeV1Router is True:  # check if pancakeswap v1 router is used
                     self.write(Fore.RED + "[MiniAudit] Contract uses PancakeSwap v1 router.")
                     return 'Bad'
 
 
                 elif (str(pancakeSwapRouterAddress) not in str(tokenContractCode['result'][0][
-                                                                   'SourceCode'])) and checkValidPancakeV2 == "True":  # check if pancakeswap v2 router is used
+                                                                   'SourceCode'])) and checkValidPancakeV2 is True:  # check if pancakeswap v2 router is used
                     self.write(Fore.RED + "[MiniAudit] Contract doesn't use valid PancakeSwap v2 router.")
                     return 'Bad'
 
                 elif "mint" in str(tokenContractCode['result'][0][
-                                       'SourceCode']) and checkMintFunction == "True":  # check if any mint function enabled
+                                       'SourceCode']) and checkMintFunction is True:  # check if any mint function enabled
                     self.write(Fore.RED + "[MiniAudit] Contract has mint function enabled.")
                     return 'Bad'
 
@@ -431,7 +431,7 @@ class SniperOMancer:
                     tokenContractCode['result'][0][
                         'SourceCode']) or "function _approve(address owner, address spender, uint256 amount) internal" in str(
                     tokenContractCode['result'][0]['SourceCode']) or "newun" in str(tokenContractCode['result'][0][
-                                                                                        'SourceCode'])) and checkHoneypot == "True":  # check if token is honeypot
+                                                                                        'SourceCode'])) and checkHoneypot is True:  # check if token is honeypot
                     self.write(Fore.RED + "[MiniAudit] Contract is a honeypot.")
                     return 'Bad'
 
